@@ -1,6 +1,8 @@
 package puremvc.core
 
 import groovy.util.logging.Slf4j
+import org.apache.logging.log4j.Level
+import org.apache.logging.log4j.core.LogEvent
 import spock.lang.Specification
 import spock.lang.Timeout
 import spock.lang.Unroll
@@ -10,7 +12,9 @@ import spock.util.concurrent.BlockingVariables
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executor
 import java.util.function.BiConsumer
+import java.util.function.Consumer
 
+import static brotherdetjr.utils.test.TestAppender.logEventConsumer
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor
 import static java.util.concurrent.CompletableFuture.completedFuture
 import static java.util.concurrent.Executors.newFixedThreadPool
@@ -127,6 +131,8 @@ class MvcTest extends Specification {
 				}
 			)
 			.build()
+		logEventConsumer = Mock(Consumer)
+		def spamEvent = EventImpl.of(SESSION_1, CHAT_1, 3)
 		when:
 		eventSource.fire EventImpl.of(SESSION_1, CHAT_1, 777)
 		barriers.getProperty 'zeroth'
@@ -134,9 +140,15 @@ class MvcTest extends Specification {
 		1 * sender.accept('2->29', CHAT_1)
 		when:
 		eventSource.fire EventImpl.of(SESSION_1, CHAT_1, 2)
-		eventSource.fire EventImpl.of(SESSION_1, CHAT_1, 3)
+		eventSource.fire spamEvent
 		barriers.getProperty 'first'
 		then:
+		1 * logEventConsumer.accept(
+			{ LogEvent event ->
+				(event.message.formattedMessage.startsWith("Looks like somebody spamming us. Event: $spamEvent")
+				&& event.level == Level.ERROR)
+			} as LogEvent
+		)
 		1 * sender.accept('not so fast', CHAT_1)
 		when:
 		serviceBarrier.set true

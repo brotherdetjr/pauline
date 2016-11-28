@@ -19,7 +19,7 @@ import static com.google.common.base.Throwables.propagateIfPossible;
 import static com.google.common.collect.Maps.newConcurrentMap;
 import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static puremvc.core.Utils.checkNotNull;
+import static brotherdetjr.utils.Utils.checkNotNull;
 
 @Slf4j
 public class Mvc<Renderer, E extends Event> {
@@ -98,7 +98,7 @@ public class Mvc<Renderer, E extends Event> {
 			session.setBusy(true);
 			process(event, dispatcher.dispatch(event, session.getState()).transit(event, session.getState()));
 		} else {
-			log.error("Looks like somebody spamming us. Event {}", event);
+			log.error("Looks like somebody spamming us. Event: {}", event);
 			renderFail(new IllegalStateException("Wait, not so fast!"), event);
 		}
 	}
@@ -118,7 +118,6 @@ public class Mvc<Renderer, E extends Event> {
 				freeSessionAndRender(event, viewAndState);
 			} else {
 				log.error("Failed to perform transition by event {}. Cause: {}", event, getStackTraceAsString(ex));
-				propagateIfPossible(ex, Error.class);
 				renderFail(ex, event);
 			}
 		}));
