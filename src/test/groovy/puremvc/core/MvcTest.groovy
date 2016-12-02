@@ -152,6 +152,26 @@ class MvcTest extends Specification {
 		executorName << EXECUTORS.keySet()
 	}
 
+	def 'executor exception is logged'() {
+		given:
+		def eventSource = new EventSourceImpl()
+		def mockedLog = Mock(Logger)
+		new Mvc.Builder(eventSource)
+			.executor({ throw new Exception() })
+			.failView({ -> })
+			.renderer({ -> })
+			.initial({ -> })
+			.controller(Long, { -> })
+			.view(Long, { -> })
+			.log(mockedLog)
+			.build()
+		when:
+		eventSource.fire EventImpl.of(SESSION_1, CHAT_1, 1313)
+		then:
+		thrown Exception
+		1 * mockedLog.error('Failed to execute event handling. Event: {}. Cause: {}', _ as EventImpl, _ as String)
+	}
+
 	static class EventImpl implements Event {
 		long sessionId
 		long chatId
