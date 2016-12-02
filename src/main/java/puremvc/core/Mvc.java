@@ -3,6 +3,8 @@ package puremvc.core;
 import com.google.common.util.concurrent.Striped;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import puremvc.core.Controller.ViewAndState;
 
 import java.beans.ConstructorProperties;
@@ -21,7 +23,6 @@ import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static brotherdetjr.utils.Utils.checkNotNull;
 
-@Slf4j
 public class Mvc<Renderer, E extends Event> {
 	private final EventSource<E> eventSource;
 	private final Dispatcher<E> dispatcher;
@@ -30,6 +31,7 @@ public class Mvc<Renderer, E extends Event> {
 	private final Map<Long, Session> sessions;
 	private final Renderer renderer;
 	private final Striped<Lock> striped;
+	private final Logger log;
 
 	@ConstructorProperties({"eventSource", "dispatcher", "failView", "executor", "sessions", "renderer"})
 	public Mvc(EventSource<E> eventSource,
@@ -38,7 +40,8 @@ public class Mvc<Renderer, E extends Event> {
 			   Executor executor,
 			   Map<Long, Session> sessions,
 			   int stripes,
-			   Renderer renderer) {
+			   Renderer renderer,
+			   Logger log) {
 		this.eventSource = eventSource;
 		this.dispatcher = dispatcher;
 		this.failView = failView;
@@ -46,6 +49,7 @@ public class Mvc<Renderer, E extends Event> {
 		this.sessions = sessions;
 		this.renderer = renderer;
 		striped = Striped.lock(stripes);
+		this.log = log;
 	}
 
 	public void init() {
@@ -168,6 +172,7 @@ public class Mvc<Renderer, E extends Event> {
 		private Map<Long, Session> sessions = newConcurrentMap();
 		private int stripes = 1000;
 		private Renderer renderer;
+		private Logger log = LoggerFactory.getLogger(Mvc.class);
 
 		private Controller<?, ?, E> initial;
 
@@ -246,6 +251,11 @@ public class Mvc<Renderer, E extends Event> {
 			return this;
 		}
 
+		public Builder<Renderer, E> log(Logger log) {
+			this.log = log;
+			return this;
+		}
+
 		public Mvc<Renderer, E> build(boolean initialized) {
 			checkNotNull(renderer, controllers, initial, failView);
 			Mvc<Renderer, E> mvc = new Mvc<>(
@@ -255,7 +265,8 @@ public class Mvc<Renderer, E extends Event> {
 				executor,
 				sessions,
 				stripes,
-				renderer
+				renderer,
+				log
 			);
 			if (initialized) {
 				mvc.init();
