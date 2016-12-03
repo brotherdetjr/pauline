@@ -24,8 +24,8 @@ public class JavaMvcTest {
 		new Mvc.Builder<BiConsumer<Long, Long>, EventImpl>(eventSource)
 			.renderer((event, from) -> rendered.add(Pair.of(event, from)))
 			.initial(event -> completedFuture(event.getValue()), Long.class)
-			.controller(Long.class, (event, from) -> completedFuture(from + event.getValue()))
-			.view(Long.class, ctx -> ctx.getRenderer().accept(ctx.getEvent().getSessionId(), ctx.getState()))
+			.handle(Long.class).with((event, from) -> completedFuture(from + event.getValue()))
+			.render(Long.class).as(ctx -> ctx.getRenderer().accept(ctx.getEvent().getSessionId(), ctx.getState()))
 			.failView(ctx -> { throw new RuntimeException(); })
 			.build();
 

@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory;
 import puremvc.core.Controller.ViewAndState;
 
 import java.beans.ConstructorProperties;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -21,6 +23,7 @@ import static com.google.common.base.Throwables.getStackTraceAsString;
 import static com.google.common.collect.Maps.newConcurrentMap;
 import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static java.util.Arrays.asList;
 
 public class Mvc<Renderer, E extends Event> {
 	private final EventSource<E> eventSource;
@@ -174,20 +177,41 @@ public class Mvc<Renderer, E extends Event> {
 
 		private Controller<?, ?, E> initial;
 
-		public <From, To> Builder<Renderer, E> rawController(Class<From> from, Controller<From, To, E> controller) {
-			controllers.put(from, controller);
-			return this;
+		@RequiredArgsConstructor
+		public class Handle<From> {
+			private final Class<From> stateClass;
+
+			public <To> Builder<Renderer, E> with(BiFunction<E, From, CompletableFuture<To>> func) {
+				return controller(stateClass, new Controller<From, To, E>() {
+					@Override
+					public <R> CompletableFuture<ViewAndState<To, R, E>> transit(E e, From s) {
+						return toViewAndState(func.apply(e, s));
+					}
+				});
+			}
+
+			public <To> Builder<Renderer, E> by(BiFunction<E, From, CompletableFuture<To>> func) {
+				return with(func);
+			}
 		}
 
-		public <From, To> Builder<Renderer, E> controller(
-			Class<From> from,
-			BiFunction<E, From, CompletableFuture<To>> func) {
-			return rawController(from, new Controller<From, To, E>() {
-				@Override
-				public <R> CompletableFuture<ViewAndState<To, R, E>> transit(E e, From s) {
-					return toViewAndState(func.apply(e, s));
-				}
-			});
+		@RequiredArgsConstructor
+		public class Render<S> {
+			private final Collection<Class<? extends S>> keys;
+
+			public Builder<Renderer, E> as(View<S, Renderer, E> view) {
+				keys.forEach(key -> views.put(key, view) );
+				return Builder.this;
+			}
+		}
+
+		public <S> Handle<S> handle(Class<S> stateClass) {
+			return new Handle<>(stateClass);
+		}
+
+		public <From, To> Builder<Renderer, E> controller(Class<From> from, Controller<From, To, E> controller) {
+			controllers.put(from, controller);
+			return this;
 		}
 
 		public <To> Builder<Renderer, E> initialController(Controller<Void, To, E> initial) {
@@ -210,18 +234,9 @@ public class Mvc<Renderer, E extends Event> {
 			return initial(func);
 		}
 
-		public <To> Builder<Renderer, E> view(Class<To> key, View<To, Renderer, E> view) {
-			views.put(key, view);
-			return this;
-		}
-
-		@SuppressWarnings("unchecked")
 		@SafeVarargs
-		public final <To> Builder<Renderer, E> view(View<To, Renderer, E> view, Class<? extends To>... keys) {
-			for (Class<? extends To> key : keys) {
-				view((Class<To>) key, view);
-			}
-			return this;
+		public final <S> Render<S> render(Class<? extends S>... keys) {
+			return new Render<S>(asList(keys));
 		}
 
 		public Builder<Renderer, E> failView(View<Throwable, Renderer, E> failView) {

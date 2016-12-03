@@ -43,15 +43,12 @@ class MvcTest extends Specification {
 			.failView({ throw new Exception() })
 			.renderer(renderer)
 			.initial({ completedFuture 29L })
-			.controller(Long, { EventImpl e, long from -> completedFuture from + e.value })
-			.view(
-				Long,
-				{ View.Context<Long, BiConsumer<String, Long>, EventImpl> ctx ->
-					def text = ctx.event.sessionId + '->' + ctx.state
-					ctx.renderer.accept text, ctx.event.chatId
-					barriers.setProperty text, true
-				}
-			)
+			.handle(Long).by({ EventImpl e, long from -> completedFuture from + e.value })
+			.render(Long).as({ View.Context<Long, BiConsumer<String, Long>, EventImpl> ctx ->
+				def text = ctx.event.sessionId + '->' + ctx.state
+				ctx.renderer.accept text, ctx.event.chatId
+				barriers.setProperty text, true
+			})
 			.build()
 		when:
 		eventSource.fire EventImpl.of(SESSION_1, CHAT_1, 100500)
@@ -118,16 +115,13 @@ class MvcTest extends Specification {
 			)
 			.renderer(renderer)
 			.initial({ completedFuture 29L })
-			.controller(Long, { EventImpl e, long from -> service.sum from, e.value })
-			.view(
-				Long,
-				{ View.Context<Long, BiConsumer<String, Long>, EventImpl> ctx ->
-					def text = ctx.event.sessionId + '->' + ctx.state
-					//noinspection GroovyAssignabilityCheck
-					ctx.renderer text, ctx.event.chatId
-					barriers.setProperty text, true
-				}
-			)
+			.handle(Long).by({ EventImpl e, long from -> service.sum from, e.value })
+			.render(Long).as({ View.Context<Long, BiConsumer<String, Long>, EventImpl> ctx ->
+				def text = ctx.event.sessionId + '->' + ctx.state
+				//noinspection GroovyAssignabilityCheck
+				ctx.renderer text, ctx.event.chatId
+				barriers.setProperty text, true
+			})
 			.log(mockedLog)
 			.build()
 		def spamEvent = EventImpl.of(SESSION_1, CHAT_1, 3)
@@ -160,8 +154,7 @@ class MvcTest extends Specification {
 			.failView({ -> })
 			.renderer({ -> })
 			.initial({ -> })
-			.controller(Long, { -> })
-			.view(Long, { -> })
+			.handle(Long).by({ -> })
 			.log(mockedLog)
 			.build()
 		when:
@@ -179,8 +172,7 @@ class MvcTest extends Specification {
 			.failView({ -> })
 			.renderer({ -> })
 			.initial({ -> })
-			.controller(Long, { -> })
-			.view(Long, { -> })
+			.handle(Long).by({ -> })
 			.log(mockedLog)
 			.build()
 		when:
@@ -197,8 +189,7 @@ class MvcTest extends Specification {
 			.failView({ -> })
 			.renderer({ -> })
 			.initial({ -> })
-			.controller(Long, { -> })
-			.view(Long, { -> })
+			.handle(Long).by({ -> })
 			.log(mockedLog)
 			.build()
 		when:
@@ -220,8 +211,7 @@ class MvcTest extends Specification {
 			.failView(failView)
 			.renderer({ -> })
 			.initial({ -> })
-			.controller(Long, { -> })
-			.view(Long, { -> })
+			.handle(Long).by({ -> })
 			.log(mockedLog)
 			.build()
 		when:
@@ -245,7 +235,6 @@ class MvcTest extends Specification {
 			.renderer({ -> })
 			.initial({ -> })
 			.controller(Long, { -> })
-			.view(Long, { -> })
 			.log(mockedLog)
 			.build()
 		when:
