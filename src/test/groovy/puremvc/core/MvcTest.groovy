@@ -20,10 +20,10 @@ import static java.util.concurrent.Executors.newFixedThreadPool
 @Timeout(2)
 class MvcTest extends Specification {
 	static final
-		SESSION_1 = 2,
-		SESSION_2 = 22,
-		CHAT_1 = 3,
-		CHAT_2 = 30,
+		SESSION_1 = 2L,
+		SESSION_2 = 22L,
+		CHAT_1 = 3L,
+		CHAT_2 = 30L,
 
 		EXECUTORS = [
 			fixed1: newFixedThreadPool(1),
@@ -152,6 +152,24 @@ class MvcTest extends Specification {
 		executorName << EXECUTORS.keySet()
 	}
 
+	def 'event is logged before running in executor'() {
+		given:
+		def eventSource = new EventSourceImpl()
+		def mockedLog = Mock(Logger)
+		new Mvc.Builder(eventSource)
+			.failView({ -> })
+			.renderer({ -> })
+			.initial({ -> })
+			.controller(Long, { -> })
+			.view(Long, { -> })
+			.log(mockedLog)
+			.build()
+		when:
+		eventSource.fire EventImpl.of(SESSION_1, CHAT_1, 1313)
+		then:
+		1 * mockedLog.debug('Received event {}', _ as EventImpl)
+	}
+
 	def 'executor exception is logged'() {
 		given:
 		def eventSource = new EventSourceImpl()
@@ -169,6 +187,28 @@ class MvcTest extends Specification {
 		eventSource.fire EventImpl.of(SESSION_1, CHAT_1, 1313)
 		then:
 		1 * mockedLog.error('Failed to execute event handling. Event: {}. Cause: {}', _ as EventImpl, _ as String)
+	}
+
+	def 'session registration is logged once'() {
+		given:
+		def eventSource = new EventSourceImpl()
+		def mockedLog = Mock(Logger)
+		new Mvc.Builder(eventSource)
+			.failView({ -> })
+			.renderer({ -> })
+			.initial({ -> })
+			.controller(Long, { -> })
+			.view(Long, { -> })
+			.log(mockedLog)
+			.build()
+		when:
+		eventSource.fire EventImpl.of(SESSION_1, CHAT_1, 1313)
+		then:
+		1 * mockedLog.debug('Registering session {}', SESSION_1)
+		when:
+		eventSource.fire EventImpl.of(SESSION_1, CHAT_1, 1313)
+		then:
+		0 * mockedLog.debug('Registering session {}', SESSION_1)
 	}
 
 	def 'event processing exception is logged and rendered by failView'() {

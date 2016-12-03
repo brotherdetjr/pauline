@@ -110,7 +110,6 @@ public class Mvc<Renderer, E extends Event> {
 		Session session = new Session(null, true);
 		long sessionId = event.getSessionId();
 		sessions.put(sessionId, session);
-		log.debug("Initialized session: {}", sessionId);
 		process(event, dispatcher.dispatch(event).transit(event));
 		return session;
 	}
