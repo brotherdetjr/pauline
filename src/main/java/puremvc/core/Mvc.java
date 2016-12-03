@@ -2,7 +2,6 @@ package puremvc.core;
 
 import com.google.common.util.concurrent.Striped;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import puremvc.core.Controller.ViewAndState;
@@ -16,12 +15,12 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import static brotherdetjr.utils.Utils.checkNotNull;
 import static com.google.common.base.Throwables.getStackTraceAsString;
 import static com.google.common.base.Throwables.propagateIfPossible;
 import static com.google.common.collect.Maps.newConcurrentMap;
 import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static brotherdetjr.utils.Utils.checkNotNull;
 
 public class Mvc<Renderer, E extends Event> {
 	private final EventSource<E> eventSource;

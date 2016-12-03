@@ -90,8 +90,8 @@ class MvcTest extends Specification {
 	@Unroll
 	def '"not so fast" message is sent when previous request is not handled yet. Executor: #executorName'() {
 		given:
-		def barriers = new BlockingVariables()
-		def serviceBarrier = new BlockingVariable<Boolean>()
+		def barriers = new BlockingVariables(2)
+		def serviceBarrier = new BlockingVariable<Boolean>(2)
 		def service = new LongRunningService(newFixedThreadPool(1), serviceBarrier)
 		def eventSource = new EventSourceImpl()
 		def sender = Mock(BiConsumer)
@@ -169,7 +169,31 @@ class MvcTest extends Specification {
 		eventSource.fire EventImpl.of(SESSION_1, CHAT_1, 1313)
 		then:
 		thrown Exception
+		1 * mockedLog.debug('Received event {}', _ as EventImpl)
 		1 * mockedLog.error('Failed to execute event handling. Event: {}. Cause: {}', _ as EventImpl, _ as String)
+	}
+
+	def 'event processing exception is logged and rendered by failView'() {
+		given:
+		def eventSource = new EventSourceImpl()
+		def mockedLog = Mock(Logger)
+		def failView = Mock(View)
+		new Mvc.Builder(eventSource)
+			.failView(failView)
+			.renderer({ -> })
+			.initial({ -> })
+			.controller(Long, { -> })
+			.view(Long, { -> })
+			.log(mockedLog)
+			.build()
+		when:
+		eventSource.fire Mock(EventImpl) {
+			//noinspection GroovyAssignabilityCheck
+			getSessionId() >> { throw new Exception() }
+		}
+		then:
+		1 * mockedLog.error('Failed to process event {}: {}', _ as EventImpl, _ as String)
+		1 * failView.render(_ as View.Context)
 	}
 
 	static class EventImpl implements Event {
