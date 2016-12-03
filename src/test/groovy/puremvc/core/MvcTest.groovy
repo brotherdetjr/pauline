@@ -168,8 +168,6 @@ class MvcTest extends Specification {
 		when:
 		eventSource.fire EventImpl.of(SESSION_1, CHAT_1, 1313)
 		then:
-		thrown Exception
-		1 * mockedLog.debug('Received event {}', _ as EventImpl)
 		1 * mockedLog.error('Failed to execute event handling. Event: {}. Cause: {}', _ as EventImpl, _ as String)
 	}
 
