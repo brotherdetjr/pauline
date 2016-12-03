@@ -99,7 +99,7 @@ class MvcTest extends Specification {
 				barriers.setProperty 'zeroth', true
 			} else if (text == 'not so fast') {
 				barriers.setProperty 'first', true
-			} else if (text == '2->31') {
+			} else if (text == '2->31' || text == '2->32') {
 				barriers.setProperty 'second', true
 			}
 			completedFuture null
@@ -124,15 +124,14 @@ class MvcTest extends Specification {
 			})
 			.log(mockedLog)
 			.build()
-		def spamEvent = EventImpl.of(SESSION_1, CHAT_1, 3)
 		when:
 		eventSource.fire EventImpl.of(SESSION_1, CHAT_1, 777)
 		barriers.getProperty 'zeroth'
 		then:
 		1 * sender.accept('2->29', CHAT_1)
 		when:
+		eventSource.fire EventImpl.of(SESSION_1, CHAT_1, 3)
 		eventSource.fire EventImpl.of(SESSION_1, CHAT_1, 2)
-		eventSource.fire spamEvent
 		barriers.getProperty 'first'
 		then:
 		1 * mockedLog.error('Looks like somebody spamming us. Event: {}', _ as EventImpl)
@@ -141,7 +140,7 @@ class MvcTest extends Specification {
 		serviceBarrier.set true
 		barriers.getProperty 'second'
 		then:
-		1 * sender.accept('2->31', CHAT_1)
+		1 * sender.accept({ it in ['2->31', '2->32']} as String, CHAT_1)
 		where:
 		executorName << EXECUTORS.keySet()
 	}
