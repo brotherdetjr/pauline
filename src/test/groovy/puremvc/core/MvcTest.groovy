@@ -196,6 +196,30 @@ class MvcTest extends Specification {
 		1 * failView.render(_ as View.Context)
 	}
 
+	def 'failView exception is logged'() {
+		given:
+		def eventSource = new EventSourceImpl()
+		def mockedLog = Mock(Logger)
+		new Mvc.Builder(eventSource)
+			.failView(Mock(View) {
+				render(_ as View.Context) >> { throw new Exception() }
+			})
+			.renderer({ -> })
+			.initial({ -> })
+			.controller(Long, { -> })
+			.view(Long, { -> })
+			.log(mockedLog)
+			.build()
+		when:
+		eventSource.fire Mock(EventImpl) {
+			//noinspection GroovyAssignabilityCheck
+			getSessionId() >> { throw new Exception() }
+		}
+		then:
+		1 * mockedLog.error('Failed to process event {}: {}', _ as EventImpl, _ as String)
+		1 * mockedLog.error('Failed to process event {} and to render it: {}', _ as EventImpl, _ as String)
+	}
+
 	static class EventImpl implements Event {
 		long sessionId
 		long chatId

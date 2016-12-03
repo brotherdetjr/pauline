@@ -11,4 +11,10 @@ public class Utils {
 			Preconditions.checkNotNull(object);
 		}
 	}
+
+	public static void propagateIfError(Throwable e) {
+		if (e instanceof Error) {
+			throw (Error) e;
+		}
+	}
 }

@@ -16,8 +16,8 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static brotherdetjr.utils.Utils.checkNotNull;
+import static brotherdetjr.utils.Utils.propagateIfError;
 import static com.google.common.base.Throwables.getStackTraceAsString;
-import static com.google.common.base.Throwables.propagateIfPossible;
 import static com.google.common.collect.Maps.newConcurrentMap;
 import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
@@ -63,13 +63,13 @@ public class Mvc<Renderer, E extends Event> {
 					handle(event);
 				} catch (Throwable ex) {
 					log.error("Failed to process event {}: {}", event, getStackTraceAsString(ex));
-					propagateIfPossible(ex, Error.class);
+					propagateIfError(ex);
 					renderFail(ex, event);
 				}
 			});
 		} catch (Throwable ex) {
 			log.error("Failed to execute event handling. Event: {}. Cause: {}", event, getStackTraceAsString(ex));
-			propagateIfPossible(ex, Error.class);
+			propagateIfError(ex);
 			renderFail(ex, event);
 		}
 	}
@@ -79,7 +79,7 @@ public class Mvc<Renderer, E extends Event> {
 			failView.render(View.Context.of(ex, renderer, event));
 		} catch (Throwable ex2) {
 			log.error("Failed to process event {} and to render it: {}", event, getStackTraceAsString(ex2));
-			propagateIfPossible(ex2, Error.class);
+			propagateIfError(ex2);
 		}
 	}
 
@@ -133,7 +133,7 @@ public class Mvc<Renderer, E extends Event> {
 				viewAndState.render(renderer, event);
 			} catch (Throwable ex) {
 				log.error("Failed to render view. Event: {}. Cause: {}", event, getStackTraceAsString(ex));
-				propagateIfPossible(ex, Error.class);
+				propagateIfError(ex);
 				renderFail(ex, event);
 			}
 		});
