@@ -60,11 +60,17 @@ public class ControllerRegistry<E extends Event> {
 
 	@RequiredArgsConstructor
 	public static class GuardedController<From, To, E extends Event> {
-		private final BiPredicate<E, From> guard;
 		private final Controller<From, To, E> controller;
+		private final BiPredicate<E, From> guard;
 
 		public Controller<From, To, E> get(E event, From state) {
 			return guard.test(event, state) ? controller : null;
+		}
+
+		public static <From, To, E extends Event> GuardedController<From, To, E> of(
+			Controller<From, To, E> controller,
+			BiPredicate<E, From> guard) {
+			return new GuardedController<>(controller, guard);
 		}
 	}
 }
