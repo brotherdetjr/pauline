@@ -3,8 +3,9 @@ package puremvc.core
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import static brotherdetjr.utils.Utils.biFalse
 import static puremvc.core.ControllerRegistry.Anchor.of as anchor
-import static puremvc.core.ControllerRegistry.GuardedController.of as guarded
+import static puremvc.core.ControllerRegistry.Guarded.of as guarded
 
 class ControllerRegistryTest extends Specification {
 
@@ -15,7 +16,7 @@ class ControllerRegistryTest extends Specification {
 	def 'subscription set 1, input: #event.class.simpleName #state.class.simpleName'() {
 		given:
 		def reg = new ControllerRegistry()
-		reg.put anchor(E3, Object), guarded(c1, { a, b -> true })
+		reg.put anchor(E3, Object), guarded(c1)
 		expect:
 		reg.get(event, state) == expected
 		where:
@@ -30,7 +31,7 @@ class ControllerRegistryTest extends Specification {
 	def 'subscription set 2, input: #event.class.simpleName #state.class.simpleName'() {
 		given:
 		def reg = new ControllerRegistry()
-		reg.put anchor(E1, S2_2), guarded(c1, { a, b -> true })
+		reg.put anchor(E1, S2_2), guarded(c1)
 		expect:
 		reg.get(event, state) == expected
 		where:
@@ -44,7 +45,7 @@ class ControllerRegistryTest extends Specification {
 	def 'subscription set 2a (guard rejects), input: #event.class.simpleName #state.class.simpleName'() {
 		given:
 		def reg = new ControllerRegistry()
-		reg.put anchor(E1, S2_2), guarded(c1, { a, b -> false })
+		reg.put anchor(E1, S2_2), guarded(c1, biFalse())
 		expect:
 		reg.get(event, state) == expected
 		where:
@@ -58,8 +59,8 @@ class ControllerRegistryTest extends Specification {
 	def 'subscription set 3, input: #event.class.simpleName #state.class.simpleName'() {
 		given:
 		def reg = new ControllerRegistry()
-		reg.put anchor(E1, S3), guarded(c1, { a, b -> true })
-		reg.put anchor(E2_1, S2_2), guarded(c2, { a, b -> true })
+		reg.put anchor(E1, S3), guarded(c1)
+		reg.put anchor(E2_1, S2_2), guarded(c2)
 		expect:
 		reg.get(event, state) == expected
 		where:

@@ -43,7 +43,7 @@ class MvcTest extends Specification {
 			.failView({ throw new Exception() })
 			.renderer(renderer)
 			.initial({ completedFuture 29L })
-			.handle(Long).by({ EventImpl e, long from -> completedFuture from + e.value })
+			.handle(EventImpl).by({ EventImpl e, long from -> completedFuture from + e.value })
 			.render(Long).as({ View.Context<Long, BiConsumer<String, Long>, EventImpl> ctx ->
 				def text = ctx.event.sessionId + '->' + ctx.state
 				ctx.renderer.accept text, ctx.event.chatId
@@ -233,7 +233,6 @@ class MvcTest extends Specification {
 			})
 			.renderer({ -> })
 			.initial({ -> })
-			.controller(Long, { -> })
 			.log(mockedLog)
 			.build()
 		when:

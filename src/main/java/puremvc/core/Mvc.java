@@ -5,9 +5,9 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import puremvc.core.Controller.ViewAndState;
+import puremvc.core.ControllerRegistry.Anchor;
 
 import java.beans.ConstructorProperties;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -101,8 +101,13 @@ public class Mvc<Renderer, E extends Event> {
 	private void processIfNotBusy(E event) {
 		Session session = sessions.get(event.getSessionId());
 		if (!session.isBusy()) {
-			session.setBusy(true);
-			process(event, dispatcher.dispatch(event, session.getState()).transit(event, session.getState()));
+			Controller<Object, ?, E> controller = dispatcher.dispatch(event, session.getState());
+			if (controller != null) {
+				session.setBusy(true);
+				process(event, controller.transit(event, session.getState()));
+			} else {
+				log.debug("Filtered out by guard: {}, {}", event, session.getState());
+			}
 		} else {
 			log.error("Looks like somebody spamming us. Event: {}", event);
 			renderFail(new IllegalStateException("Wait, not so fast!"), event);
@@ -167,7 +172,7 @@ public class Mvc<Renderer, E extends Event> {
 	public static class Builder<Renderer, E extends Event> {
 		private final EventSource<E> eventSource;
 		private Map<Class<?>, View<?, Renderer, E>> views = newHashMap();
-		private Map<Class<?>, Controller<?, ?, E>> controllers = newHashMap();
+		private ControllerRegistry<E> controllers = new ControllerRegistry<>();
 		private View<Throwable, Renderer, E> failView;
 		private Executor executor = directExecutor();
 		private Map<Long, Session> sessions = newConcurrentMap();
@@ -178,40 +183,58 @@ public class Mvc<Renderer, E extends Event> {
 		private Controller<?, ?, E> initial;
 
 		@RequiredArgsConstructor
-		public class Handle<From> {
-			private final Class<From> stateClass;
+		public class Handle {
+			private final Class<? extends E> eventClass;
 
-			public <To> Builder<Renderer, E> with(BiFunction<E, From, CompletableFuture<To>> func) {
-				return controller(stateClass, new Controller<From, To, E>() {
-					@Override
-					public <R> CompletableFuture<ViewAndState<To, R, E>> transit(E e, From s) {
-						return toViewAndState(func.apply(e, s));
-					}
-				});
+			public <To, From> Builder<Renderer, E> with(BiFunction<E, From, CompletableFuture<To>> func) {
+				return new When<From>(null).with(func);
 			}
 
-			public <To> Builder<Renderer, E> by(BiFunction<E, From, CompletableFuture<To>> func) {
+			public <To, From> Builder<Renderer, E> by(BiFunction<E, From, CompletableFuture<To>> func) {
 				return with(func);
+			}
+
+			public <From> When<From> when(From state) {
+				return new When<>(state);
+			}
+
+			@RequiredArgsConstructor
+			public class When<From> {
+				private final Object state;
+
+				public <To> Builder<Renderer, E> with(BiFunction<E, From, CompletableFuture<To>> func) {
+					controllers.put(Anchor.of(eventClass, state), new Controller<From, To, E>() {
+						@Override
+						public <R> CompletableFuture<ViewAndState<To, R, E>> transit(E e, From s) {
+							return toViewAndState(func.apply(e, s));
+						}
+					});
+					return Builder.this;
+				}
+
+				public <To> Builder<Renderer, E> by(BiFunction<E, From, CompletableFuture<To>> func) {
+					return with(func);
+				}
+
 			}
 		}
 
 		@RequiredArgsConstructor
-		public class Render<S> {
-			private final Collection<Class<? extends S>> keys;
+		public class Render<State> {
+			private final Collection<Class<? extends State>> keys;
 
-			public Builder<Renderer, E> as(View<S, Renderer, E> view) {
+			public Builder<Renderer, E> as(View<State, Renderer, E> view) {
 				keys.forEach(key -> views.put(key, view) );
 				return Builder.this;
 			}
 		}
 
-		public <S> Handle<S> handle(Class<S> stateClass) {
-			return new Handle<>(stateClass);
+		public Handle handle(Class<E> eventClass) {
+			return new Handle(eventClass);
 		}
 
-		public <From, To> Builder<Renderer, E> controller(Class<From> from, Controller<From, To, E> controller) {
-			controllers.put(from, controller);
-			return this;
+		public Handle handle() {
+			return new Handle(null);
 		}
 
 		public <To> Builder<Renderer, E> initialController(Controller<Void, To, E> initial) {
@@ -236,7 +259,7 @@ public class Mvc<Renderer, E extends Event> {
 
 		@SafeVarargs
 		public final <S> Render<S> render(Class<? extends S>... keys) {
-			return new Render<S>(asList(keys));
+			return new Render<>(asList(keys));
 		}
 
 		public Builder<Renderer, E> failView(View<Throwable, Renderer, E> failView) {
@@ -270,7 +293,7 @@ public class Mvc<Renderer, E extends Event> {
 		}
 
 		public Mvc<Renderer, E> build(boolean initialized) {
-			checkNotNull(renderer, controllers, initial, failView);
+			checkNotNull(renderer, initial, failView);
 			Mvc<Renderer, E> mvc = new Mvc<>(
 				eventSource,
 				newDispatcher(),
@@ -297,13 +320,7 @@ public class Mvc<Renderer, E extends Event> {
 				@Override
 				public <From> Controller<From, ?, E> dispatch(E event, From state) {
 					if (state != null) {
-						Controller<?, ?, E> controller = controllers.get(state.getClass());
-						if (controller == null) {
-							throw new IllegalArgumentException(
-								"No controller registered for state type " + state.getClass()
-							);
-						}
-						return (Controller<From, ?, E>) controller;
+						return controllers.get(event, state);
 					} else {
 						return (Controller<From, ?, E>) initial;
 					}

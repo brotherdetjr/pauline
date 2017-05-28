@@ -4,23 +4,35 @@ import lombok.EqualsAndHashCode;
 import lombok.RequiredArgsConstructor;
 
 import java.util.Map;
-import java.util.function.BiPredicate;
 
+import static com.google.common.base.Optional.fromNullable;
 import static com.google.common.collect.Maps.newHashMap;
 
 public class ControllerRegistry<E extends Event> {
 
-	private final Map<Anchor<? extends E, ?>, GuardedController<?, ?, ? extends E>> registry = newHashMap();
+	private final Map<Anchor<? extends E, ?>, Controller<?, ?, E>> registry = newHashMap();
 
-	public void put(Anchor<? extends E, ?> anchor, GuardedController<?, ?, ? extends E> guarded) {
-		registry.put(anchor, guarded);
+	public void put(Anchor<? extends E, ?> anchor, Controller<?, ?, E> controller) {
+		registry.put(anchor, controller);
 	}
 
-	@SuppressWarnings({"unchecked"})
+	@SuppressWarnings({"unchecked", "SuspiciousMethodCalls"})
 	public <From, To> Controller<From, To, E> get(E event, From state) {
 		Class<? extends Event> eventClass = event.getClass();
+		return (Controller<From, To, E>) fromNullable(getController(eventClass, state))
+			.or(fromNullable(getController(eventClass, null)))
+			.or(fromNullable(getController(Event.class, state)))
+			.or(() -> {
+				throw new IllegalArgumentException("No controller registered for state " + state +
+					" and event class " + event.getClass().getName());
+			});
+	}
+
+	@SuppressWarnings({"unchecked", "SuspiciousMethodCalls"})
+	private <From, To> Controller<From, To, E> getController(Class<? extends Event> eventClass, From state) {
 		while (Event.class.isAssignableFrom(eventClass)) {
-			Controller<From, To, E> controller = findByState(event, state, eventClass);
+			Controller<From, To, E> controller = ((Controller<From, To, E>)
+				registry.get(Anchor.of(eventClass, state)));
 			if (controller != null) {
 				return controller;
 			}
@@ -29,48 +41,19 @@ public class ControllerRegistry<E extends Event> {
 		return null;
 	}
 
-	@SuppressWarnings({"unchecked", "SuspiciousMethodCalls"})
-	private <From, To> Controller<From, To, E> findByState(E event, From state, Class<? extends Event> eventClass) {
-		Class<?> stateClass = state.getClass();
-		while (stateClass != null) {
-			GuardedController<From, ?, E> guarded =
-				(GuardedController<From, ?, E>) registry.get(Anchor.of(eventClass, stateClass));
-			if (guarded != null) {
-				Controller<?, ?, ? extends E> controller = guarded.get(event, state);
-				if (controller != null) {
-					return (Controller<From, To, E>) controller;
-				}
-			}
-			stateClass = stateClass.getSuperclass();
-		}
-		return null;
-	}
-
 	@RequiredArgsConstructor
-	@EqualsAndHashCode()
+	@EqualsAndHashCode
 	public static class Anchor<E extends Event, State> {
 		private final Class<E> eventClass;
-		private final Class<State> stateClass;
+		private final State state;
 
-		public static <E extends Event, State> Anchor<E, State> of(Class<E> eventClass, Class<State> stateClass) {
-			return new Anchor<>(eventClass, stateClass);
+		public static <E extends Event, State> Anchor<E, State> of(Class<E> eventClass, State state) {
+			return new Anchor<>(eventClass, state);
 		}
 
-	}
-
-	@RequiredArgsConstructor
-	public static class GuardedController<From, To, E extends Event> {
-		private final Controller<From, To, E> controller;
-		private final BiPredicate<E, From> guard;
-
-		public Controller<From, To, E> get(E event, From state) {
-			return guard.test(event, state) ? controller : null;
-		}
-
-		public static <From, To, E extends Event> GuardedController<From, To, E> of(
-			Controller<From, To, E> controller,
-			BiPredicate<E, From> guard) {
-			return new GuardedController<>(controller, guard);
+		public static <E extends Event, State> Anchor<E, State> of(Class<E> eventClass) {
+			return of(eventClass, null);
 		}
 	}
+
 }
