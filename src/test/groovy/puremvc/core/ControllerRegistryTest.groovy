@@ -3,8 +3,6 @@ package puremvc.core
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import static puremvc.core.ControllerRegistry.Anchor.of as anchor
-
 class ControllerRegistryTest extends Specification {
 
 	static def c1 = { null } as Controller
@@ -17,7 +15,7 @@ class ControllerRegistryTest extends Specification {
 	def 'subscription set 1, input: #event.class.simpleName #state'() {
 		given:
 		def reg = new ControllerRegistry<E1>()
-		reg.put anchor(E2_1, state1), c1
+		reg.put E2_1, state1, c1
 		expect:
 		reg.get(event.class, state) == expected
 		where:
@@ -32,7 +30,7 @@ class ControllerRegistryTest extends Specification {
 	def 'subscription set 2, input: #event.class.simpleName #state'() {
 		given:
 		def reg = new ControllerRegistry<E1>()
-		reg.put anchor(E1, state1), c1
+		reg.put E1, state1, c1
 		expect:
 		reg.get(event.class, state) == expected
 		where:
@@ -48,8 +46,8 @@ class ControllerRegistryTest extends Specification {
 	def 'subscription set 3, input: #event.class.simpleName #state'() {
 		given:
 		def reg = new ControllerRegistry<E1>()
-		reg.put anchor(E2_1, state1), c1
-		reg.put anchor(E1, null), c2
+		reg.put E2_1, state1, c1
+		reg.put E1, null, c2
 		expect:
 		reg.get(event.class, state) == expected
 		where:

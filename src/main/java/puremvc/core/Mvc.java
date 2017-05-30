@@ -4,7 +4,6 @@ import com.google.common.util.concurrent.Striped;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import puremvc.core.ControllerRegistry.Anchor;
 
 import java.util.Collection;
 import java.util.Map;
@@ -206,7 +205,7 @@ public class Mvc<Renderer, E extends Event> {
 
 				@SuppressWarnings("unchecked")
 				public <To> Builder<Renderer, E> with(BiFunction<E1, From, CompletableFuture<?>> func) {
-					controllers.put(Anchor.of((Class<E>) eventClass, state), new Controller<From, To, E1>() {
+					controllers.put((Class<E>) eventClass, state, new Controller<From, To, E1>() {
 						@Override
 						public <R> CompletableFuture<ViewAndState<To, R, E1>> transit(E1 e, From s) {
 							return toViewAndState((CompletableFuture<To>) func.apply(e, s));
@@ -281,11 +280,13 @@ public class Mvc<Renderer, E extends Event> {
 			return this;
 		}
 
+		@SuppressWarnings("unused")
 		public Builder<Renderer, E> sessions(Map<Long, Session> sessions) {
 			this.sessions = sessions;
 			return this;
 		}
 
+		@SuppressWarnings("unused")
 		public Builder<Renderer, E> stripes(int stripes) {
 			this.stripes = stripes;
 			return this;
