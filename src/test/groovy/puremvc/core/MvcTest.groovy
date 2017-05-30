@@ -115,7 +115,7 @@ class MvcTest extends Specification {
 			)
 			.renderer(renderer)
 			.initial({ completedFuture 29L })
-			.handle(Long).by({ EventImpl e, long from -> service.sum from, e.value })
+			.handle(EventImpl).by({ EventImpl e, long from -> service.sum from, e.value })
 			.render(Long).as({ View.Context<Long, BiConsumer<String, Long>, EventImpl> ctx ->
 				def text = ctx.event.sessionId + '->' + ctx.state
 				//noinspection GroovyAssignabilityCheck

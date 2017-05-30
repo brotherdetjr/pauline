@@ -196,10 +196,6 @@ public class Mvc<Renderer, E extends Event> {
 				return with(func);
 			}
 
-			public Builder<Renderer, E> by(Function<E1, CompletableFuture<?>> func) {
-				return with(func);
-			}
-
 			public <From> When<From> when(From state) {
 				return new When<>(state);
 			}
@@ -224,10 +220,6 @@ public class Mvc<Renderer, E extends Event> {
 				}
 
 				public Builder<Renderer, E> by(BiFunction<E1, From, CompletableFuture<?>> func) {
-					return with(func);
-				}
-
-				public Builder<Renderer, E> by(Function<E1, CompletableFuture<?>> func) {
 					return with(func);
 				}
 
