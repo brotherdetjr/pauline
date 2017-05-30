@@ -153,7 +153,7 @@ class MvcTest extends Specification {
 			.failView({ -> })
 			.renderer({ -> })
 			.initial({ -> })
-			.handle(Long).by({ -> })
+			.handle(EventImpl).by({ -> })
 			.log(mockedLog)
 			.build()
 		when:
@@ -171,7 +171,7 @@ class MvcTest extends Specification {
 			.failView({ -> })
 			.renderer({ -> })
 			.initial({ -> })
-			.handle(Long).by({ -> })
+			.handle(EventImpl).by({ -> })
 			.log(mockedLog)
 			.build()
 		when:
@@ -188,7 +188,7 @@ class MvcTest extends Specification {
 			.failView({ -> })
 			.renderer({ -> })
 			.initial({ -> })
-			.handle(Long).by({ -> })
+			.handle(EventImpl).by({ -> })
 			.log(mockedLog)
 			.build()
 		when:
@@ -210,7 +210,7 @@ class MvcTest extends Specification {
 			.failView(failView)
 			.renderer({ -> })
 			.initial({ -> })
-			.handle(Long).by({ -> })
+			.handle(EventImpl).by({ -> })
 			.log(mockedLog)
 			.build()
 		when:
