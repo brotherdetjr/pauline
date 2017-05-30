@@ -12,10 +12,13 @@ import java.util.function.BiConsumer;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static java.util.concurrent.CompletableFuture.completedFuture;
+import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.junit.Assert.assertThat;
 
 public class JavaMvcTest {
+
+	private volatile boolean failed;
 
 	@Test
 	public void toEnsureGenericsWorkCorrectly() {
@@ -32,7 +35,7 @@ public class JavaMvcTest {
 			.handle().with(event -> completedFuture(12L))
 			.render(Long.class).as(ctx -> ctx.getRenderer().accept(ctx.getEvent().getSessionId(), ctx.getState()))
 			.render(S2.class).as(ctx -> ctx.getRenderer().accept(ctx.getEvent().getSessionId(), 999L))
-			.failView(ctx -> { throw new RuntimeException(ctx.getState()); })
+			.failView(ctx -> { failed = true; throw new RuntimeException(ctx.getState()); })
 			.build();
 
 		eventSource
@@ -63,6 +66,8 @@ public class JavaMvcTest {
 				Pair.of(4L, 42L)
 			)
 		));
+
+		assertThat(failed, is(false));
 	}
 
 	@Getter
