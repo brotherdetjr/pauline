@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory;
 import puremvc.core.Controller.ViewAndState;
 import puremvc.core.ControllerRegistry.Anchor;
 
-import java.beans.ConstructorProperties;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -35,7 +34,6 @@ public class Mvc<Renderer, E extends Event> {
 	private final Striped<Lock> striped;
 	private final Logger log;
 
-	@ConstructorProperties({"eventSource", "dispatcher", "failView", "executor", "sessions", "renderer"})
 	public Mvc(EventSource<E> eventSource,
 			   Dispatcher<E> dispatcher,
 			   View<Throwable, Renderer, E> failView,
@@ -183,14 +181,22 @@ public class Mvc<Renderer, E extends Event> {
 		private Controller<?, ?, E> initial;
 
 		@RequiredArgsConstructor
-		public class Handle {
-			private final Class<? extends E> eventClass;
+		public class Handle<E1 extends E> {
+			private final Class<? extends Event> eventClass;
 
-			public <To, From> Builder<Renderer, E> with(BiFunction<E, From, CompletableFuture<To>> func) {
+			public <To, From> Builder<Renderer, E> with(BiFunction<E1, From, CompletableFuture<To>> func) {
 				return new When<From>(null).with(func);
 			}
 
-			public <To, From> Builder<Renderer, E> by(BiFunction<E, From, CompletableFuture<To>> func) {
+			public <To> Builder<Renderer, E> with(Function<E1, CompletableFuture<To>> func) {
+				return with((event, ignore) -> func.apply(event));
+			}
+
+			public <To, From> Builder<Renderer, E> by(BiFunction<E1, From, CompletableFuture<To>> func) {
+				return with(func);
+			}
+
+			public <To> Builder<Renderer, E> by(Function<E1, CompletableFuture<To>> func) {
 				return with(func);
 			}
 
@@ -202,17 +208,26 @@ public class Mvc<Renderer, E extends Event> {
 			public class When<From> {
 				private final Object state;
 
-				public <To> Builder<Renderer, E> with(BiFunction<E, From, CompletableFuture<To>> func) {
-					controllers.put(Anchor.of(eventClass, state), new Controller<From, To, E>() {
+				@SuppressWarnings("unchecked")
+				public <To> Builder<Renderer, E> with(BiFunction<E1, From, CompletableFuture<To>> func) {
+					controllers.put(Anchor.of((Class<E>) eventClass, state), new Controller<From, To, E1>() {
 						@Override
-						public <R> CompletableFuture<ViewAndState<To, R, E>> transit(E e, From s) {
+						public <R> CompletableFuture<ViewAndState<To, R, E1>> transit(E1 e, From s) {
 							return toViewAndState(func.apply(e, s));
 						}
 					});
 					return Builder.this;
 				}
 
-				public <To> Builder<Renderer, E> by(BiFunction<E, From, CompletableFuture<To>> func) {
+				public <To> Builder<Renderer, E> with(Function<E1, CompletableFuture<To>> func) {
+					return with((event, ignore) -> func.apply(event));
+				}
+
+				public <To> Builder<Renderer, E> by(BiFunction<E1, From, CompletableFuture<To>> func) {
+					return with(func);
+				}
+
+				public <To> Builder<Renderer, E> by(Function<E1, CompletableFuture<To>> func) {
 					return with(func);
 				}
 
@@ -224,17 +239,18 @@ public class Mvc<Renderer, E extends Event> {
 			private final Collection<Class<? extends State>> keys;
 
 			public Builder<Renderer, E> as(View<State, Renderer, E> view) {
-				keys.forEach(key -> views.put(key, view) );
+				keys.forEach(key -> views.put(key, view));
 				return Builder.this;
 			}
 		}
 
-		public Handle handle(Class<E> eventClass) {
-			return new Handle(eventClass);
+		public <E1 extends E> Handle<E1> handle(Class<E1> eventClass) {
+			return new Handle<E1>(eventClass);
 		}
 
-		public Handle handle() {
-			return new Handle(null);
+		@SuppressWarnings("unchecked")
+		public <E1 extends E> Handle<E1> handle() {
+			return new Handle<E1>(Event.class);
 		}
 
 		public <To> Builder<Renderer, E> initialController(Controller<Void, To, E> initial) {
@@ -320,7 +336,7 @@ public class Mvc<Renderer, E extends Event> {
 				@Override
 				public <From> Controller<From, ?, E> dispatch(E event, From state) {
 					if (state != null) {
-						return controllers.get(event, state);
+						return controllers.get(event.getClass(), state);
 					} else {
 						return (Controller<From, ?, E>) initial;
 					}
@@ -329,8 +345,9 @@ public class Mvc<Renderer, E extends Event> {
 		}
 
 		@SuppressWarnings("unchecked")
-		private <To, R> CompletableFuture<ViewAndState<To, R, E>> toViewAndState(CompletableFuture<To> future) {
-			return future.thenApply(n -> ViewAndState.of((View<To, R, E>) views.get(n.getClass()), n));
+		private <To, R, E1 extends E> CompletableFuture<ViewAndState<To, R, E1>> toViewAndState(
+			CompletableFuture<To> future) {
+			return future.thenApply(n -> ViewAndState.of((View<To, R, E1>) views.get(n.getClass()), n));
 		}
 	}
 }

@@ -2,47 +2,51 @@ package puremvc.core;
 
 import lombok.EqualsAndHashCode;
 import lombok.RequiredArgsConstructor;
+import lombok.ToString;
 
 import java.util.Map;
 
-import static com.google.common.base.Optional.fromNullable;
 import static com.google.common.collect.Maps.newHashMap;
 
 public class ControllerRegistry<E extends Event> {
 
-	private final Map<Anchor<? extends E, ?>, Controller<?, ?, E>> registry = newHashMap();
+	private final Map<Anchor<? extends Event, ?>, Controller<?, ?, ? extends E>> registry = newHashMap();
 
-	public void put(Anchor<? extends E, ?> anchor, Controller<?, ?, E> controller) {
+	public void put(Anchor<? extends E, ?> anchor, Controller<?, ?, ? extends E> controller) {
 		registry.put(anchor, controller);
 	}
 
-	@SuppressWarnings({"unchecked", "SuspiciousMethodCalls"})
-	public <From, To> Controller<From, To, E> get(E event, From state) {
-		Class<? extends Event> eventClass = event.getClass();
-		return (Controller<From, To, E>) fromNullable(getController(eventClass, state))
-			.or(fromNullable(getController(eventClass, null)))
-			.or(fromNullable(getController(Event.class, state)))
-			.or(() -> {
-				throw new IllegalArgumentException("No controller registered for state " + state +
-					" and event class " + event.getClass().getName());
-			});
-	}
-
-	@SuppressWarnings({"unchecked", "SuspiciousMethodCalls"})
-	private <From, To> Controller<From, To, E> getController(Class<? extends Event> eventClass, From state) {
-		while (Event.class.isAssignableFrom(eventClass)) {
-			Controller<From, To, E> controller = ((Controller<From, To, E>)
-				registry.get(Anchor.of(eventClass, state)));
+	public <From, To> Controller<From, To, E> get(Class<? extends Event> eventClass, From state) {
+		Class<? extends Event> clazz = eventClass;
+		while (clazz != null) {
+			Controller<From, To, E> controller = getController(clazz, state);
 			if (controller != null) {
 				return controller;
 			}
-			eventClass = (Class<? extends Event>) eventClass.getSuperclass();
+			controller = getController(clazz, null);
+			if (controller != null) {
+				return controller;
+			}
+			clazz = getParent(clazz);
 		}
-		return null;
+		throw new IllegalArgumentException("No controller registered for state " + state +
+			" and event class " + eventClass.getName());
+	}
+
+	@SuppressWarnings("unchecked")
+	private static Class<? extends Event> getParent(Class<? extends Event> eventClass) {
+		eventClass = (Class<? extends Event>) eventClass.getSuperclass();
+		return Object.class.equals(eventClass) ? Event.class : eventClass;
+	}
+
+	@SuppressWarnings("unchecked")
+	private <From, To> Controller<From, To, E> getController(Class<? extends Event> eventClass, From state) {
+		return (Controller<From, To, E>) registry.get(Anchor.of(eventClass, state));
 	}
 
 	@RequiredArgsConstructor
 	@EqualsAndHashCode
+	@ToString
 	public static class Anchor<E extends Event, State> {
 		private final Class<E> eventClass;
 		private final State state;

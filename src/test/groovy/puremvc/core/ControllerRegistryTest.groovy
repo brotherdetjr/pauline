@@ -3,9 +3,7 @@ package puremvc.core
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import static brotherdetjr.utils.Utils.biFalse
 import static puremvc.core.ControllerRegistry.Anchor.of as anchor
-import static puremvc.core.ControllerRegistry.Guarded.of as guarded
 
 class ControllerRegistryTest extends Specification {
 

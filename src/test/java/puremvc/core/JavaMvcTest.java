@@ -20,13 +20,15 @@ public class JavaMvcTest {
 	@Test
 	public void toEnsureGenericsWorkCorrectly() {
 		List<Pair<Long, Long>> rendered = newArrayList();
-		EventSourceImpl<EventImpl> eventSource = new EventSourceImpl<>();
-		new Mvc.Builder<BiConsumer<Long, Long>, EventImpl>(eventSource)
+		EventSourceImpl<EventBase> eventSource = new EventSourceImpl<>();
+		new Mvc.Builder<BiConsumer<Long, Long>, EventBase>(eventSource)
 			.renderer((event, from) -> rendered.add(Pair.of(event, from)))
 			.initial(event -> completedFuture(event.getValue()), Long.class)
+			.handle(EventImplChild.class).when(555L).with(event -> completedFuture(event.getValue2()))
+			.handle(EventImpl.class).when(101L).with(event -> completedFuture(event.getValue()))
 			.handle(EventImpl.class).with((EventImpl event, Long from) -> completedFuture(from + event.getValue()))
-//			.handle().when(1L).with((event, from) -> completedFuture(from + event.getValue()))
-//			.handle(EventImpl.class).when(1L).with((event, from) -> completedFuture(from + event.getValue()))
+			.handle().when(101L).with(event -> { throw new RuntimeException(); }) // must not be triggered
+			.handle().with(event -> completedFuture(12L))
 			.render(Long.class).as(ctx -> ctx.getRenderer().accept(ctx.getEvent().getSessionId(), ctx.getState()))
 			.failView(ctx -> { throw new RuntimeException(); })
 			.build();
@@ -36,7 +38,11 @@ public class JavaMvcTest {
 			.fire(EventImpl.of(2, 3))
 			.fire(EventImpl.of(3, 99))
 			.fire(EventImpl.of(2, 3))
-			.fire(EventImpl.of(3, 2));
+			.fire(EventImpl.of(3, 2))
+			.fire(EventImpl.of(3, 555))
+			.fire(EventImplChild.of(3, 1024, 444))
+			.fire(EventImplChild.of(3, 999, 111))
+			.fire(EventImpl2.of(2, 20));
 
 		assertThat(rendered, equalTo(
 			ImmutableList.of(
@@ -44,7 +50,11 @@ public class JavaMvcTest {
 				Pair.of(2L, 35L),
 				Pair.of(3L, 99L),
 				Pair.of(2L, 38L),
-				Pair.of(3L, 101L)
+				Pair.of(3L, 101L),
+				Pair.of(3L, 555L),
+				Pair.of(3L, 444L),
+				Pair.of(3L, 1443L),
+				Pair.of(2L, 12L)
 			)
 		));
 	}
@@ -52,12 +62,43 @@ public class JavaMvcTest {
 	@Getter
 	@RequiredArgsConstructor
 	@ToString
-	public static class EventImpl implements Event {
+	public static abstract class EventBase implements Event {
 		private final long sessionId;
 		private final long value;
+	}
+
+	public static class EventImpl extends EventBase {
+		public EventImpl(long sessionId, long value) {
+			super(sessionId, value);
+		}
 
 		public static EventImpl of(long sessionId, long value) {
 			return new EventImpl(sessionId, value);
+		}
+	}
+
+	@Getter
+	@ToString
+	public static class EventImplChild extends EventImpl {
+		private final long value2;
+
+		public EventImplChild(long sessionId, long value, long value2) {
+			super(sessionId, value);
+			this.value2 = value2;
+		}
+
+		public static EventImplChild of(long sessionId, long value, long value2) {
+			return new EventImplChild(sessionId, value, value2);
+		}
+	}
+
+	public static class EventImpl2 extends EventBase {
+		public EventImpl2(long sessionId, long value) {
+			super(sessionId, value);
+		}
+
+		public static EventImpl2 of(long sessionId, long value) {
+			return new EventImpl2(sessionId, value);
 		}
 	}
 
