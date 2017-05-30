@@ -23,11 +23,12 @@ public class JavaMvcTest {
 		EventSourceImpl<EventBase> eventSource = new EventSourceImpl<>();
 		new Mvc.Builder<BiConsumer<Long, Long>, EventBase>(eventSource)
 			.renderer((event, from) -> rendered.add(Pair.of(event, from)))
-			.initial(event -> completedFuture(event.getValue()), Long.class)
+			.initial(event -> completedFuture(event.getSessionId() != 4L ? event.getValue() : "Hello"), Object.class)
 			.handle(EventImplChild.class).when(555L).with(event -> completedFuture(event.getValue2()))
 			.handle(EventImpl.class).when(101L).with(event -> completedFuture(event.getValue()))
 			.handle(EventImpl.class).<Long>with((event, from) -> completedFuture(from + event.getValue()))
 			.handle().when(101L).with(event -> { throw new RuntimeException(); }) // must not be triggered
+			.handle().when(String.class).with(event -> completedFuture(42L))
 			.handle().with(event -> completedFuture(12L))
 			.render(Long.class).as(ctx -> ctx.getRenderer().accept(ctx.getEvent().getSessionId(), ctx.getState()))
 			.failView(ctx -> { throw new RuntimeException(); })
@@ -42,7 +43,9 @@ public class JavaMvcTest {
 			.fire(EventImpl.of(3, 555))
 			.fire(EventImplChild.of(3, 1024, 444))
 			.fire(EventImplChild.of(3, 999, 111))
-			.fire(EventImpl2.of(2, 20));
+			.fire(EventImpl2.of(2, 20))
+			.fire(EventImpl2.of(4, 11))
+			.fire(EventImpl2.of(4, 12));
 
 		assertThat(rendered, equalTo(
 			ImmutableList.of(
@@ -54,7 +57,8 @@ public class JavaMvcTest {
 				Pair.of(3L, 555L),
 				Pair.of(3L, 444L),
 				Pair.of(3L, 1443L),
-				Pair.of(2L, 12L)
+				Pair.of(2L, 12L),
+				Pair.of(4L, 42L)
 			)
 		));
 	}

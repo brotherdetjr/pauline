@@ -199,6 +199,10 @@ public class Mvc<Renderer, E extends Event> {
 				return new When<>(state);
 			}
 
+			public <From> When<From> when(Class<From> stateClass) {
+				return new When<>(stateClass);
+			}
+
 			@RequiredArgsConstructor
 			public class When<From> {
 				private final Object state;

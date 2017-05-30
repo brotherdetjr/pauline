@@ -23,6 +23,10 @@ public class ControllerRegistry<E extends Event> {
 			if (controller != null) {
 				return controller;
 			}
+			controller = getController(clazz, state.getClass());
+			if (controller != null) {
+				return controller;
+			}
 			controller = getController(clazz, null);
 			if (controller != null) {
 				return controller;
@@ -39,7 +43,7 @@ public class ControllerRegistry<E extends Event> {
 	}
 
 	@SuppressWarnings("unchecked")
-	private <From, To> Controller<From, To, E> getController(Class<? extends Event> eventClass, From state) {
+	private <From, To> Controller<From, To, E> getController(Class<? extends Event> eventClass, Object state) {
 		return (Controller<From, To, E>) registry.get(new Anchor<>(eventClass, state));
 	}
 

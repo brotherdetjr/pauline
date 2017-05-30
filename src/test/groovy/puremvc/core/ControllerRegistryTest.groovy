@@ -45,9 +45,11 @@ class ControllerRegistryTest extends Specification {
 	@Unroll
 	def 'subscription set 3, input: #event.class.simpleName #state'() {
 		given:
-		def reg = new ControllerRegistry<E1>()
+		def reg = new ControllerRegistry<Event>()
 		reg.put E2_1, state1, c1
 		reg.put E1, null, c2
+		reg.put Event, String, c2
+		reg.put Event, null, c1
 		expect:
 		reg.get(event.class, state) == expected
 		where:
@@ -57,9 +59,17 @@ class ControllerRegistryTest extends Specification {
 		new E3()   | state2 | c2
 		new E2_2() | state2 | c2
 		new E2_2() | state1 | c2
+		new E1_2() | state1 | c2
+		new E1_2() | state2 | c2
+		new E1_2() | String | c2
+		new E1_2() | 123L   | c1
 	}
 
 	class E1 implements Event {
+		long sessionId
+	}
+
+	class E1_2 implements Event {
 		long sessionId
 	}
 
