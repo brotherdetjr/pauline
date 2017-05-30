@@ -10,62 +10,55 @@ class ControllerRegistryTest extends Specification {
 	static def c1 = { null } as Controller
 	static def c2 = { null } as Controller
 
+	static def state1 = 'state1'
+	static def state2 = 'state2'
+
 	@Unroll
-	def 'subscription set 1, input: #event.class.simpleName #state.class.simpleName'() {
+	def 'subscription set 1, input: #event.class.simpleName #state'() {
 		given:
-		def reg = new ControllerRegistry()
-		reg.put anchor(E3, Object), guarded(c1)
+		def reg = new ControllerRegistry<E1>()
+		reg.put anchor(E2_1, state1), c1
 		expect:
-		reg.get(event, state) == expected
+		reg.get(event.class, state) == expected
 		where:
-		event      | state      | expected
-		new E3()   | new S1()   | c1
-		new E3()   | new S3()   | c1
-		new E2_1() | new S1()   | null
-		new E2_2() | new S2_2() | null
+		event      | state  | expected
+		new E2_1() | state1 | c1
+		new E3()   | state1 | c1
+		new E3()   | state2 | null
+		new E2_2() | state2 | null
 	}
 
 	@Unroll
-	def 'subscription set 2, input: #event.class.simpleName #state.class.simpleName'() {
+	def 'subscription set 2, input: #event.class.simpleName #state'() {
 		given:
-		def reg = new ControllerRegistry()
-		reg.put anchor(E1, S2_2), guarded(c1)
+		def reg = new ControllerRegistry<E1>()
+		reg.put anchor(E1, state1), c1
 		expect:
-		reg.get(event, state) == expected
+		reg.get(event.class, state) == expected
 		where:
-		event    | state      | expected
-		new E3() | new S3()   | c1
-		new E1() | new S2_2() | c1
-		new E1() | new S2_1() | null
+		event      | state  | expected
+		new E2_1() | state1 | c1
+		new E3()   | state1 | c1
+		new E3()   | state2 | null
+		new E2_2() | state2 | null
+		new E2_2() | state1 | c1
 	}
 
 	@Unroll
-	def 'subscription set 2a (guard rejects), input: #event.class.simpleName #state.class.simpleName'() {
+	def 'subscription set 3, input: #event.class.simpleName #state'() {
 		given:
-		def reg = new ControllerRegistry()
-		reg.put anchor(E1, S2_2), guarded(c1, biFalse())
+		def reg = new ControllerRegistry<E1>()
+		reg.put anchor(E2_1, state1), c1
+		reg.put anchor(E1, null), c2
 		expect:
-		reg.get(event, state) == expected
+		reg.get(event.class, state) == expected
 		where:
-		event    | state      | expected
-		new E3() | new S3()   | null
-		new E1() | new S2_2() | null
-		new E1() | new S2_1() | null
-	}
-
-	@Unroll
-	def 'subscription set 3, input: #event.class.simpleName #state.class.simpleName'() {
-		given:
-		def reg = new ControllerRegistry()
-		reg.put anchor(E1, S3), guarded(c1)
-		reg.put anchor(E2_1, S2_2), guarded(c2)
-		expect:
-		reg.get(event, state) == expected
-		where:
-		event      | state    | expected
-		new E2_2() | new S3() | c1
-		new E3()   | new S3() | c2
-		new E3()   | new S1() | null
+		event      | state  | expected
+		new E2_1() | state1 | c1
+		new E3()   | state1 | c1
+		new E3()   | state2 | c2
+		new E2_2() | state2 | c2
+		new E2_2() | state1 | c2
 	}
 
 	class E1 implements Event {
@@ -78,11 +71,4 @@ class ControllerRegistryTest extends Specification {
 
 	class E3 extends E2_1 {}
 
-	class S1 {}
-
-	class S2_1 extends S1 {}
-
-	class S2_2 extends S1 {}
-
-	class S3 extends S2_2 {}
 }

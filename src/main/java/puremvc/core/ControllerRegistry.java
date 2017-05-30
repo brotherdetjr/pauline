@@ -29,8 +29,7 @@ public class ControllerRegistry<E extends Event> {
 			}
 			clazz = getParent(clazz);
 		}
-		throw new IllegalArgumentException("No controller registered for state " + state +
-			" and event class " + eventClass.getName());
+		return null;
 	}
 
 	@SuppressWarnings("unchecked")

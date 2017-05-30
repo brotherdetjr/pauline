@@ -4,7 +4,6 @@ import com.google.common.util.concurrent.Striped;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import puremvc.core.Controller.ViewAndState;
 import puremvc.core.ControllerRegistry.Anchor;
 
 import java.util.Collection;
@@ -23,6 +22,7 @@ import static com.google.common.collect.Maps.newConcurrentMap;
 import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.util.Arrays.asList;
+import static java.util.Objects.requireNonNull;
 
 public class Mvc<Renderer, E extends Event> {
 	private final EventSource<E> eventSource;
@@ -223,7 +223,7 @@ public class Mvc<Renderer, E extends Event> {
 					return with((event, ignore) -> func.apply(event));
 				}
 
-				public  Builder<Renderer, E> by(BiFunction<E1, From, CompletableFuture<?>> func) {
+				public Builder<Renderer, E> by(BiFunction<E1, From, CompletableFuture<?>> func) {
 					return with(func);
 				}
 
@@ -234,6 +234,7 @@ public class Mvc<Renderer, E extends Event> {
 			}
 		}
 
+		@SuppressWarnings("MismatchedQueryAndUpdateOfCollection")
 		@RequiredArgsConstructor
 		public class Render<State> {
 			private final Collection<Class<? extends State>> keys;
@@ -336,7 +337,9 @@ public class Mvc<Renderer, E extends Event> {
 				@Override
 				public <From> Controller<From, ?, E> dispatch(E event, From state) {
 					if (state != null) {
-						return controllers.get(event.getClass(), state);
+						return requireNonNull(controllers.get(event.getClass(), state),
+							() -> "No controller registered for state " + state +
+								" and event class " + event.getClass().getName());
 					} else {
 						return (Controller<From, ?, E>) initial;
 					}
