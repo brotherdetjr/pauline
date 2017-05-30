@@ -23,15 +23,16 @@ public class JavaMvcTest {
 		EventSourceImpl<EventBase> eventSource = new EventSourceImpl<>();
 		new Mvc.Builder<BiConsumer<Long, Long>, EventBase>(eventSource)
 			.renderer((event, from) -> rendered.add(Pair.of(event, from)))
-			.initial(event -> completedFuture(event.getSessionId() != 4L ? event.getValue() : "Hello"), Object.class)
+			.initial(event -> completedFuture(event.getSessionId() != 4L ? event.getValue() : new S2()), Object.class)
 			.handle(EventImplChild.class).when(555L).with(event -> completedFuture(event.getValue2()))
 			.handle(EventImpl.class).when(101L).with(event -> completedFuture(event.getValue()))
 			.handle(EventImpl.class).<Long>with((event, from) -> completedFuture(from + event.getValue()))
 			.handle().when(101L).with(event -> { throw new RuntimeException(); }) // must not be triggered
-			.handle().when(String.class).with(event -> completedFuture(42L))
+			.handle().when(S1.class).with(event -> completedFuture(42L))
 			.handle().with(event -> completedFuture(12L))
 			.render(Long.class).as(ctx -> ctx.getRenderer().accept(ctx.getEvent().getSessionId(), ctx.getState()))
-			.failView(ctx -> { throw new RuntimeException(); })
+			.render(S2.class).as(ctx -> ctx.getRenderer().accept(ctx.getEvent().getSessionId(), 999L))
+			.failView(ctx -> { throw new RuntimeException(ctx.getState()); })
 			.build();
 
 		eventSource
@@ -58,6 +59,7 @@ public class JavaMvcTest {
 				Pair.of(3L, 444L),
 				Pair.of(3L, 1443L),
 				Pair.of(2L, 12L),
+				Pair.of(4L, 999L),
 				Pair.of(4L, 42L)
 			)
 		));
@@ -106,4 +108,11 @@ public class JavaMvcTest {
 		}
 	}
 
+	public static class S1 {
+		// nothing
+	}
+
+	public static class S2 extends S1 {
+		// nothing
+	}
 }

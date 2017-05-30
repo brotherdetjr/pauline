@@ -184,7 +184,7 @@ public class Mvc<Renderer, E extends Event> {
 			private final Class<? extends Event> eventClass;
 
 			public <From> Builder<Renderer, E> with(BiFunction<E1, From, CompletableFuture<?>> func) {
-				return new When<From>(null).with(func);
+				return new When<From>().with(func);
 			}
 
 			public Builder<Renderer, E> with(Function<E1, CompletableFuture<?>> func) {
@@ -203,18 +203,41 @@ public class Mvc<Renderer, E extends Event> {
 				return new When<>(stateClass);
 			}
 
-			@RequiredArgsConstructor
 			public class When<From> {
-				private final Object state;
+				private final From state;
+				private final Class<From> stateClass;
+
+				public When(From state) {
+					this.state = state;
+					stateClass = null;
+				}
+
+				public When(Class<From> stateClass) {
+					this.stateClass = stateClass;
+					state = null;
+				}
+
+				public When() {
+					state = null;
+					stateClass = null;
+				}
 
 				@SuppressWarnings("unchecked")
 				public <To> Builder<Renderer, E> with(BiFunction<E1, From, CompletableFuture<?>> func) {
-					controllers.put((Class<E>) eventClass, state, new Controller<From, To, E1>() {
+					Controller<From, To, E1> controller = new Controller<From, To, E1>() {
 						@Override
 						public <R> CompletableFuture<ViewAndState<To, R, E1>> transit(E1 e, From s) {
 							return toViewAndState((CompletableFuture<To>) func.apply(e, s));
 						}
-					});
+					};
+					Class<E> eventClass = (Class<E>) Handle.this.eventClass;
+					if (state != null) {
+						controllers.put(eventClass, state, controller);
+					} else if (stateClass != null) {
+						controllers.put(eventClass, stateClass, controller);
+					} else {
+						controllers.put(eventClass, controller);
+					}
 					return Builder.this;
 				}
 

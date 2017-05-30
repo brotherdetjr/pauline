@@ -153,7 +153,7 @@ class MvcTest extends Specification {
 			.failView({ -> })
 			.renderer({ -> })
 			.initial({ -> })
-			.handle(EventImpl).when(null).by({ -> })
+			.handle(EventImpl).when(Object).by({ -> }) // .when(Object) here to do more coverage
 			.log(mockedLog)
 			.build()
 		when:
