@@ -6,6 +6,7 @@ import lombok.ToString;
 
 import java.util.Map;
 
+import static brotherdetjr.utils.Utils.searchInHierarchy;
 import static com.google.common.collect.Maps.newHashMap;
 
 public class ControllerRegistry<E extends Event> {
@@ -57,14 +58,7 @@ public class ControllerRegistry<E extends Event> {
 
 	@SuppressWarnings("unchecked")
 	private <From, To> Controller<From, To, E> getController(Class<? extends Event> eventClass, Class<?> stateClass) {
-		while (stateClass != null) {
-			Controller<?, ?, ? extends E> controller = registry.get(Anchor.of(eventClass, stateClass));
-			if (controller != null) {
-				return (Controller<From, To, E>) controller;
-			}
-			stateClass = stateClass.getSuperclass();
-		}
-		return null;
+		return searchInHierarchy(stateClass, c -> (Controller<From, To, E>) registry.get(Anchor.of(eventClass, c)));
 	}
 
 	@SuppressWarnings("unchecked")

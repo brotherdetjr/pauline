@@ -15,6 +15,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static brotherdetjr.utils.Utils.checkNotNull;
+import static brotherdetjr.utils.Utils.searchInHierarchy;
 import static brotherdetjr.utils.Utils.propagateIfError;
 import static com.google.common.base.Throwables.getStackTraceAsString;
 import static com.google.common.collect.Maps.newConcurrentMap;
@@ -370,7 +371,9 @@ public class Mvc<Renderer, E extends Event> {
 		@SuppressWarnings("unchecked")
 		private <To, R, E1 extends E> CompletableFuture<ViewAndState<To, R, E1>> toViewAndState(
 			CompletableFuture<To> future) {
-			return future.thenApply(n -> ViewAndState.of((View<To, R, E1>) views.get(n.getClass()), n));
+			return future.thenApply(n ->
+				ViewAndState.of(searchInHierarchy(n.getClass(), c -> (View<To, R, E1>) views.get(c)), n)
+			);
 		}
 	}
 }

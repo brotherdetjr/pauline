@@ -30,11 +30,11 @@ public class JavaMvcTest {
 			.handle(EventImplChild.class).when(555L).with(event -> completedFuture(event.getValue2()))
 			.handle(EventImpl.class).when(101L).with(event -> completedFuture(event.getValue()))
 			.handle(EventImpl.class).<Long>with((event, from) -> completedFuture(from + event.getValue()))
-			.handle().when(101L).with(event -> { throw new RuntimeException(); }) // must not be triggered
+			.handle().when(101L).with(event -> { failed = true; throw new RuntimeException(); }) // must not be triggered
 			.handle().when(S1.class).with(event -> completedFuture(42L))
 			.handle().with(event -> completedFuture(12L))
 			.render(Long.class).as(ctx -> ctx.getRenderer().accept(ctx.getEvent().getSessionId(), ctx.getState()))
-			.render(S2.class).as(ctx -> ctx.getRenderer().accept(ctx.getEvent().getSessionId(), 999L))
+			.render(S1.class).as(ctx -> ctx.getRenderer().accept(ctx.getEvent().getSessionId(), 999L))
 			.failView(ctx -> { failed = true; throw new RuntimeException(ctx.getState()); })
 			.build();
 
