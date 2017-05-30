@@ -26,7 +26,7 @@ public class JavaMvcTest {
 			.initial(event -> completedFuture(event.getValue()), Long.class)
 			.handle(EventImplChild.class).when(555L).with(event -> completedFuture(event.getValue2()))
 			.handle(EventImpl.class).when(101L).with(event -> completedFuture(event.getValue()))
-			.handle(EventImpl.class).with((EventImpl event, Long from) -> completedFuture(from + event.getValue()))
+			.handle(EventImpl.class).<Long>with((event, from) -> completedFuture(from + event.getValue()))
 			.handle().when(101L).with(event -> { throw new RuntimeException(); }) // must not be triggered
 			.handle().with(event -> completedFuture(12L))
 			.render(Long.class).as(ctx -> ctx.getRenderer().accept(ctx.getEvent().getSessionId(), ctx.getState()))

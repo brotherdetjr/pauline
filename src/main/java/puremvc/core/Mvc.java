@@ -184,19 +184,19 @@ public class Mvc<Renderer, E extends Event> {
 		public class Handle<E1 extends E> {
 			private final Class<? extends Event> eventClass;
 
-			public <To, From> Builder<Renderer, E> with(BiFunction<E1, From, CompletableFuture<To>> func) {
+			public <From> Builder<Renderer, E> with(BiFunction<E1, From, CompletableFuture<?>> func) {
 				return new When<From>(null).with(func);
 			}
 
-			public <To> Builder<Renderer, E> with(Function<E1, CompletableFuture<To>> func) {
+			public Builder<Renderer, E> with(Function<E1, CompletableFuture<?>> func) {
 				return with((event, ignore) -> func.apply(event));
 			}
 
-			public <To, From> Builder<Renderer, E> by(BiFunction<E1, From, CompletableFuture<To>> func) {
+			public <From> Builder<Renderer, E> by(BiFunction<E1, From, CompletableFuture<?>> func) {
 				return with(func);
 			}
 
-			public <To> Builder<Renderer, E> by(Function<E1, CompletableFuture<To>> func) {
+			public Builder<Renderer, E> by(Function<E1, CompletableFuture<?>> func) {
 				return with(func);
 			}
 
@@ -209,25 +209,25 @@ public class Mvc<Renderer, E extends Event> {
 				private final Object state;
 
 				@SuppressWarnings("unchecked")
-				public <To> Builder<Renderer, E> with(BiFunction<E1, From, CompletableFuture<To>> func) {
+				public <To> Builder<Renderer, E> with(BiFunction<E1, From, CompletableFuture<?>> func) {
 					controllers.put(Anchor.of((Class<E>) eventClass, state), new Controller<From, To, E1>() {
 						@Override
 						public <R> CompletableFuture<ViewAndState<To, R, E1>> transit(E1 e, From s) {
-							return toViewAndState(func.apply(e, s));
+							return toViewAndState((CompletableFuture<To>) func.apply(e, s));
 						}
 					});
 					return Builder.this;
 				}
 
-				public <To> Builder<Renderer, E> with(Function<E1, CompletableFuture<To>> func) {
+				public Builder<Renderer, E> with(Function<E1, CompletableFuture<?>> func) {
 					return with((event, ignore) -> func.apply(event));
 				}
 
-				public <To> Builder<Renderer, E> by(BiFunction<E1, From, CompletableFuture<To>> func) {
+				public  Builder<Renderer, E> by(BiFunction<E1, From, CompletableFuture<?>> func) {
 					return with(func);
 				}
 
-				public <To> Builder<Renderer, E> by(Function<E1, CompletableFuture<To>> func) {
+				public Builder<Renderer, E> by(Function<E1, CompletableFuture<?>> func) {
 					return with(func);
 				}
 
