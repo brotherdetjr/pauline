@@ -12,6 +12,8 @@
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>
 
+		<brotherdetjr.utils.version>1.0.0-SNAPSHOT</brotherdetjr.utils.version>
+
 		<log4j2.version>2.7</log4j2.version>
 		<lombok.version>1.16.10</lombok.version>
 		<slf4j.version>1.7.21</slf4j.version>
@@ -40,6 +42,13 @@
 	</build>
 
 	<dependencies>
+
+		<dependency>
+			<groupId>brotherdetjr.utils</groupId>
+			<artifactId>utils</artifactId>
+			<version>${brotherdetjr.utils.version}</version>
+		</dependency>
+
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
