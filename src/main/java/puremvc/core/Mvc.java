@@ -15,14 +15,15 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static brotherdetjr.utils.Utils.checkNotNull;
-import static brotherdetjr.utils.Utils.searchInHierarchy;
 import static brotherdetjr.utils.Utils.propagateIfError;
+import static brotherdetjr.utils.Utils.searchInHierarchy;
 import static com.google.common.base.Throwables.getStackTraceAsString;
 import static com.google.common.collect.Maps.newConcurrentMap;
 import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
+import static java.util.Optional.ofNullable;
 
 public class Mvc<Renderer, E extends Event> {
 	private final EventSource<E> eventSource;
@@ -100,12 +101,8 @@ public class Mvc<Renderer, E extends Event> {
 		Session session = sessions.get(event.getSessionId());
 		if (!session.isBusy()) {
 			Controller<Object, ?, E> controller = dispatcher.dispatch(event, session.getState());
-			if (controller != null) {
-				session.setBusy(true);
-				process(event, controller.transit(event, session.getState()));
-			} else {
-				log.debug("Filtered out by guard: {}, {}", event, session.getState());
-			}
+			session.setBusy(true);
+			process(event, controller.transit(event, session.getState()));
 		} else {
 			log.error("Looks like somebody spamming us. Event: {}", event);
 			renderFail(new IllegalStateException("Wait, not so fast!"), event);
@@ -372,7 +369,14 @@ public class Mvc<Renderer, E extends Event> {
 		private <To, R, E1 extends E> CompletableFuture<ViewAndState<To, R, E1>> toViewAndState(
 			CompletableFuture<To> future) {
 			return future.thenApply(n ->
-				ViewAndState.of(searchInHierarchy(n.getClass(), c -> (View<To, R, E1>) views.get(c)), n)
+				ViewAndState.of(
+					ofNullable(
+						searchInHierarchy(n.getClass(), c -> (View<To, R, E1>) views.get(c))
+					).orElseThrow(() -> new IllegalStateException(
+						"No view defined for state class " + n.getClass().getName())
+					),
+					n
+				)
 			);
 		}
 	}

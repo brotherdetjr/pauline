@@ -245,6 +245,32 @@ class MvcTest extends Specification {
 		1 * mockedLog.error('Failed to process event {} and to render it: {}', _ as EventImpl, _ as String)
 	}
 
+	@SuppressWarnings("GroovyAssignabilityCheck")
+	def 'No defined view for state exception is logged'() {
+		given:
+		def failed = false
+		def event = EventImpl.of(SESSION_1, CHAT_1, 1313)
+		def eventSource = new EventSourceImpl()
+		def nextState = 2L
+		def mockedLog = Mock(Logger) {
+			1 * error('Failed to perform transition by event {}. Cause: {}', _ as EventImpl, _ as String) >>
+				{ String msg, EventImpl evt, String trace ->
+					failed |= !event.is(evt)
+					failed |= !trace.contains("No view defined for state class ${nextState.class.name}")
+				}
+		}
+		new Mvc.Builder(eventSource)
+			.initial({ completedFuture nextState })
+			.renderer({ -> })
+			.failView({ -> })
+			.log(mockedLog)
+			.build()
+		when:
+		eventSource.fire event
+		then:
+		!failed
+	}
+
 	static class EventImpl implements Event {
 		long sessionId
 		long chatId
