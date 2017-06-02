@@ -25,7 +25,7 @@ public class JavaMvcTest {
 		List<Pair<Long, Long>> rendered = newArrayList();
 		EventSourceImpl<EventBase> eventSource = new EventSourceImpl<>();
 		new Mvc.Builder<BiConsumer<Long, Long>, EventBase>(eventSource)
-			.renderer((event, from) -> rendered.add(Pair.of(event, from)))
+			.rendererFactory(event -> (e, from) -> rendered.add(Pair.of(e, from)))
 			.initial(event -> completedFuture(event.getSessionId() != 4L ? event.getValue() : new S2()), Object.class)
 			.handle(EventImplChild.class).when(555L).with(event -> completedFuture(event.getValue2()))
 			.handle(EventImpl.class).when(101L).with(event -> completedFuture(event.getValue()))

@@ -41,7 +41,7 @@ class MvcTest extends Specification {
 		new Mvc.Builder(eventSource)
 			.executor(EXECUTORS[executorName])
 			.failView({ throw new Exception() })
-			.renderer(renderer)
+			.rendererFactory({ renderer })
 			.initial({ completedFuture 29L })
 			.handle(EventImpl).by({ EventImpl e, long from -> completedFuture from + e.value })
 			.render(Long).as({ View.Context<Long, BiConsumer<String, Long>, EventImpl> ctx ->
@@ -113,7 +113,7 @@ class MvcTest extends Specification {
 					ctx.renderer 'not so fast', ctx.event.chatId
 				}
 			)
-			.renderer(renderer)
+			.rendererFactory({ renderer })
 			.initial({ completedFuture 29L })
 			.handle(EventImpl).by({ EventImpl e, long from -> service.sum from, e.value })
 			.render(Long).as({ View.Context<Long, BiConsumer<String, Long>, EventImpl> ctx ->
@@ -151,7 +151,7 @@ class MvcTest extends Specification {
 		def mockedLog = Mock(Logger)
 		new Mvc.Builder(eventSource)
 			.failView({ -> })
-			.renderer({ -> })
+			.rendererFactory({ EventImpl e -> { -> } })
 			.initial({ -> })
 			.handle(EventImpl).when(Object).by({ -> }) // .when(Object) here to do more coverage
 			.log(mockedLog)
@@ -169,7 +169,7 @@ class MvcTest extends Specification {
 		new Mvc.Builder(eventSource)
 			.executor({ throw new Exception() })
 			.failView({ -> })
-			.renderer({ -> })
+			.rendererFactory({ EventImpl e -> { -> } })
 			.initial({ -> })
 			.handle(EventImpl).by({ -> })
 			.log(mockedLog)
@@ -186,7 +186,7 @@ class MvcTest extends Specification {
 		def mockedLog = Mock(Logger)
 		new Mvc.Builder(eventSource)
 			.failView({ -> })
-			.renderer({ -> })
+			.rendererFactory({ EventImpl e -> { -> } })
 			.initial({ -> })
 			.handle(EventImpl).by({ -> })
 			.log(mockedLog)
@@ -208,7 +208,7 @@ class MvcTest extends Specification {
 		def failView = Mock(View)
 		new Mvc.Builder(eventSource)
 			.failView(failView)
-			.renderer({ -> })
+			.rendererFactory({ EventImpl e -> { -> } })
 			.initial({ -> })
 			.handle(EventImpl).by({ -> })
 			.log(mockedLog)
@@ -231,7 +231,7 @@ class MvcTest extends Specification {
 			.failView(Mock(View) {
 				render(_ as View.Context) >> { throw new Exception() }
 			})
-			.renderer({ -> })
+			.rendererFactory({ EventImpl e -> { -> } })
 			.initial({ -> })
 			.log(mockedLog)
 			.build()
@@ -261,7 +261,7 @@ class MvcTest extends Specification {
 		}
 		new Mvc.Builder(eventSource)
 			.initial({ completedFuture nextState })
-			.renderer({ -> })
+			.rendererFactory({ EventImpl e -> { -> } })
 			.failView({ -> })
 			.log(mockedLog)
 			.build()

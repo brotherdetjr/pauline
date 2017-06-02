@@ -31,7 +31,7 @@ public class Mvc<Renderer, E extends Event> {
 	private final View<Throwable, Renderer, E> failView;
 	private final Executor executor;
 	private final Map<Long, Session> sessions;
-	private final Renderer renderer;
+	private final Function<E, Renderer> rendererFactory;
 	private final Striped<Lock> striped;
 	private final Logger log;
 
@@ -41,14 +41,14 @@ public class Mvc<Renderer, E extends Event> {
 			   Executor executor,
 			   Map<Long, Session> sessions,
 			   int stripes,
-			   Renderer renderer,
+			   Function<E, Renderer> rendererFactory,
 			   Logger log) {
 		this.eventSource = eventSource;
 		this.dispatcher = dispatcher;
 		this.failView = failView;
 		this.executor = executor;
 		this.sessions = sessions;
-		this.renderer = renderer;
+		this.rendererFactory = rendererFactory;
 		striped = Striped.lock(stripes);
 		this.log = log;
 	}
@@ -78,7 +78,7 @@ public class Mvc<Renderer, E extends Event> {
 
 	private void renderFail(Throwable ex, E event) {
 		try {
-			failView.render(View.Context.of(ex, renderer, event));
+			failView.render(View.Context.of(ex, rendererFactory.apply(event), event));
 		} catch (Throwable ex2) {
 			log.error("Failed to process event {} and to render it: {}", event, getStackTraceAsString(ex2));
 			propagateIfError(ex2);
@@ -132,7 +132,7 @@ public class Mvc<Renderer, E extends Event> {
 		synched(event.getSessionId(), ignore -> {
 			try {
 				freeSession(event, viewAndState);
-				viewAndState.render(renderer, event);
+				viewAndState.render(rendererFactory.apply(event), event);
 			} catch (Throwable ex) {
 				log.error("Failed to render view. Event: {}. Cause: {}", event, getStackTraceAsString(ex));
 				propagateIfError(ex);
@@ -172,7 +172,7 @@ public class Mvc<Renderer, E extends Event> {
 		private Executor executor = directExecutor();
 		private Map<Long, Session> sessions = newConcurrentMap();
 		private int stripes = 1000;
-		private Renderer renderer;
+		private Function<E, Renderer> rendererFactory;
 		private Logger log = LoggerFactory.getLogger(Mvc.class);
 
 		private Controller<?, ?, E> initial;
@@ -317,8 +317,8 @@ public class Mvc<Renderer, E extends Event> {
 			return this;
 		}
 
-		public Builder<Renderer, E> renderer(Renderer renderer) {
-			this.renderer = renderer;
+		public Builder<Renderer, E> rendererFactory(Function<E, Renderer> rendererFactory) {
+			this.rendererFactory = rendererFactory;
 			return this;
 		}
 
@@ -328,7 +328,7 @@ public class Mvc<Renderer, E extends Event> {
 		}
 
 		public Mvc<Renderer, E> build(boolean initialized) {
-			checkNotNull(renderer, initial, failView);
+			checkNotNull(rendererFactory, initial, failView);
 			Mvc<Renderer, E> mvc = new Mvc<>(
 				eventSource,
 				newDispatcher(),
@@ -336,7 +336,7 @@ public class Mvc<Renderer, E extends Event> {
 				executor,
 				sessions,
 				stripes,
-				renderer,
+				rendererFactory,
 				log
 			);
 			if (initialized) {
