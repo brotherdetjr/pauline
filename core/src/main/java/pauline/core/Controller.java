@@ -1,4 +1,4 @@
-package puremvc.core;
+package pauline.core;
 
 import java.util.concurrent.CompletableFuture;
 
