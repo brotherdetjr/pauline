@@ -1,7 +1,7 @@
 package brotherdetjr.pauline.core;
 
 @FunctionalInterface
-public interface Dispatcher<E> {
+public interface Dispatcher<E extends Event> {
 
 	<From, To> Controller<From, To, E> dispatch(E event, From state);
 

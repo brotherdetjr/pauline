@@ -1,5 +1,6 @@
 package brotherdetjr.pauline.telegram;
 
+import brotherdetjr.pauline.telegram.events.TelegramEvent;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.ApiContextInitializer;
@@ -22,13 +23,12 @@ public class TelegramEngine {
 	}
 
 	@SneakyThrows(TelegramApiRequestException.class)
-	public static Engine.Builder<TelegramRenderer, Update> builder(String token, String name) {
-		AtomicReference<Consumer<Update>> ref = new AtomicReference<>();
+	public static Engine.Builder<TelegramRenderer, TelegramEvent> builder(String token, String name) {
+		AtomicReference<Consumer<TelegramEvent>> ref = new AtomicReference<>();
 		TelegramLongPollingBot bot = new TelegramBotImpl(token, name, ref);
 		new TelegramBotsApi().registerBot(bot);
-		return new Engine.Builder<TelegramRenderer, Update>(ref::set)
-			.sessionIdFunc(TelegramUtils::extractUserId) // TODO something based both on userId and chatId
-			.rendererFactory(e -> new TelegramRenderer(bot, extractChatId(e)))
+		return new Engine.Builder<TelegramRenderer, TelegramEvent>(ref::set)
+			.rendererFactory(e -> new TelegramRenderer(bot, e.getChatId()))
 			.failView(new TelegramDefaultFailView());
 	}
 

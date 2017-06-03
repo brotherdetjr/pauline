@@ -9,7 +9,7 @@ import java.util.Map;
 import static brotherdetjr.utils.Utils.searchInHierarchy;
 import static com.google.common.collect.Maps.newHashMap;
 
-public class ControllerRegistry<E> {
+public class ControllerRegistry<E extends Event> {
 
 	private final Map<Anchor<? extends E, ?>, Controller<?, ?, ? extends E>> registry = newHashMap();
 
@@ -47,8 +47,10 @@ public class ControllerRegistry<E> {
 		return null;
 	}
 
-	private static <E> Class<? super E> getParent(Class<E> eventClass) {
-		return eventClass.getSuperclass();
+	@SuppressWarnings("unchecked")
+	private static <E extends Event> Class<? super E> getParent(Class<E> eventClass) {
+		eventClass = (Class<E>) eventClass.getSuperclass();
+		return Object.class.equals(eventClass) ? Event.class : eventClass;
 	}
 
 	@SuppressWarnings("unchecked")

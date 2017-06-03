@@ -40,7 +40,6 @@ class EngineTest extends Specification {
 		def barriers = new BlockingVariables()
 		new Engine.Builder(eventSource)
 			.executor(EXECUTORS[executorName])
-			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView({ throw new Exception() })
 			.rendererFactory({ renderer })
 			.initial({ completedFuture 29L })
@@ -108,7 +107,6 @@ class EngineTest extends Specification {
 		def mockedLog = Mock(Logger)
 		new Engine.Builder(eventSource)
 			.executor(EXECUTORS[executorName])
-			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView(
 				{ View.Context<Long, BiConsumer<String, Long>, EventImpl> ctx ->
 					//noinspection GroovyAssignabilityCheck
@@ -152,7 +150,6 @@ class EngineTest extends Specification {
 		def eventSource = new EventSourceImpl()
 		def mockedLog = Mock(Logger)
 		new Engine.Builder(eventSource)
-			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView({ -> })
 			.rendererFactory({ EventImpl e -> { -> } })
 			.initial({ -> })
@@ -171,7 +168,6 @@ class EngineTest extends Specification {
 		def mockedLog = Mock(Logger)
 		new Engine.Builder(eventSource)
 			.executor({ throw new Exception() })
-			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView({ -> })
 			.rendererFactory({ EventImpl e -> { -> } })
 			.initial({ -> })
@@ -189,7 +185,6 @@ class EngineTest extends Specification {
 		def eventSource = new EventSourceImpl()
 		def mockedLog = Mock(Logger)
 		new Engine.Builder(eventSource)
-			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView({ -> })
 			.rendererFactory({ EventImpl e -> { -> } })
 			.initial({ -> })
@@ -212,7 +207,6 @@ class EngineTest extends Specification {
 		def mockedLog = Mock(Logger)
 		def failView = Mock(View)
 		new Engine.Builder(eventSource)
-			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView(failView)
 			.rendererFactory({ EventImpl e -> { -> } })
 			.initial({ -> })
@@ -234,7 +228,6 @@ class EngineTest extends Specification {
 		def eventSource = new EventSourceImpl()
 		def mockedLog = Mock(Logger)
 		new Engine.Builder(eventSource)
-			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView(Mock(View) {
 				render(_ as View.Context) >> { throw new Exception() }
 			})
@@ -267,7 +260,6 @@ class EngineTest extends Specification {
 				}
 		}
 		new Engine.Builder(eventSource)
-			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.initial({ completedFuture nextState })
 			.rendererFactory({ EventImpl e -> { -> } })
 			.failView({ -> })
@@ -279,7 +271,7 @@ class EngineTest extends Specification {
 		!failed
 	}
 
-	static class EventImpl {
+	static class EventImpl implements Event {
 		long sessionId
 		long chatId
 		long value

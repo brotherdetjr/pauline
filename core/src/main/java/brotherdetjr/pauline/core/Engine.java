@@ -25,9 +25,8 @@ import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
 
-public class Engine<Renderer, E> {
+public class Engine<Renderer, E extends Event> {
 	private final EventSource<E> eventSource;
-	private final Function<E, Long> sessionIdFunc;
 	private final Dispatcher<E> dispatcher;
 	private final View<Throwable, Renderer, E> failView;
 	private final Executor executor;
@@ -37,7 +36,6 @@ public class Engine<Renderer, E> {
 	private final Logger log;
 
 	public Engine(EventSource<E> eventSource,
-				  Function<E, Long> sessionIdFunc,
 				  Dispatcher<E> dispatcher,
 				  View<Throwable, Renderer, E> failView,
 				  Executor executor,
@@ -46,7 +44,6 @@ public class Engine<Renderer, E> {
 				  Function<E, Renderer> rendererFactory,
 				  Logger log) {
 		this.eventSource = eventSource;
-		this.sessionIdFunc = sessionIdFunc;
 		this.dispatcher = dispatcher;
 		this.failView = failView;
 		this.executor = executor;
@@ -89,7 +86,7 @@ public class Engine<Renderer, E> {
 	}
 
 	private void handle(E event) {
-		long sessionId = sessionIdFunc.apply(event);
+		long sessionId = event.getSessionId();
 		synched(sessionId, session -> {
 			if (session != null) {
 				processIfNotBusy(event);
@@ -102,7 +99,7 @@ public class Engine<Renderer, E> {
 
 	@SuppressWarnings("SuspiciousMethodCalls")
 	private void processIfNotBusy(E event) {
-		Session session = sessions.get(sessionIdFunc.apply(event));
+		Session session = sessions.get(event.getSessionId());
 		if (!session.isBusy()) {
 			Controller<Object, ?, E> controller = dispatcher.dispatch(event, session.getState());
 			session.setBusy(true);
@@ -115,8 +112,7 @@ public class Engine<Renderer, E> {
 
 	private Session initSessionAndProcess(E event) {
 		Session session = new Session(null, true);
-		long sessionId = sessionIdFunc.apply(event);
-		sessions.put(sessionId, session);
+		sessions.put(event.getSessionId(), session);
 		process(event, dispatcher.dispatch(event).transit(event));
 		return session;
 	}
@@ -133,7 +129,7 @@ public class Engine<Renderer, E> {
 	}
 
 	private void freeSessionAndRender(E event, ViewAndState<?, Renderer, E> viewAndState) {
-		synched(sessionIdFunc.apply(event), ignore -> {
+		synched(event.getSessionId(), ignore -> {
 			try {
 				freeSession(event, viewAndState);
 				viewAndState.render(rendererFactory.apply(event), event);
@@ -146,13 +142,12 @@ public class Engine<Renderer, E> {
 	}
 
 	private void freeSession(E event, ViewAndState<?, Renderer, E> viewAndState) {
-		Long sessionId = sessionIdFunc.apply(event);
-		Session session = sessions.get(sessionId);
+		Session session = sessions.get(event.getSessionId());
 		session.setState(viewAndState.getState());
 		session.setBusy(false);
 		log.debug(
 			"Set new state for session {}: {}. View key: {}",
-			sessionId,
+			event.getSessionId(),
 			viewAndState.getState(),
 			viewAndState.getState().getClass().getName()
 		);
@@ -169,9 +164,8 @@ public class Engine<Renderer, E> {
 	}
 
 	@RequiredArgsConstructor
-	public static class Builder<Renderer, E> {
+	public static class Builder<Renderer, E extends Event> {
 		private final EventSource<E> eventSource;
-		private Function<E, Long> sessionIdFunc;
 		private Map<Class<?>, View<?, Renderer, E>> views = newHashMap();
 		private ControllerRegistry<E> controllers = new ControllerRegistry<>();
 		private View<Throwable, Renderer, E> failView;
@@ -273,7 +267,7 @@ public class Engine<Renderer, E> {
 
 		@SuppressWarnings("unchecked")
 		public <E1 extends E> Handle<E1> handle() {
-			return new Handle<>((Class<E1>) Object.class);
+			return new Handle<>((Class<E1>) Event.class);
 		}
 
 		public <To> Builder<Renderer, E> initialController(Controller<Void, To, E> initial) {
@@ -288,11 +282,6 @@ public class Engine<Renderer, E> {
 					return toViewAndState(func.apply(e));
 				}
 			});
-		}
-
-		public Builder<Renderer, E> sessionIdFunc(Function<E, Long> sessionIdFunc) {
-			this.sessionIdFunc = sessionIdFunc;
-			return this;
 		}
 
 		public <To> Builder<Renderer, E> initial(
@@ -339,10 +328,9 @@ public class Engine<Renderer, E> {
 		}
 
 		public Engine<Renderer, E> build(boolean initialized) {
-			checkNotNull(rendererFactory, sessionIdFunc, initial, failView);
+			checkNotNull(rendererFactory, initial, failView);
 			Engine<Renderer, E> engine = new Engine<>(
 				eventSource,
-				sessionIdFunc,
 				newDispatcher(),
 				failView,
 				executor,

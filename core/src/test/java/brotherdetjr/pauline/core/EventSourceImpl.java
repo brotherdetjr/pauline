@@ -5,7 +5,7 @@ import java.util.function.Consumer;
 
 import static com.google.common.collect.Lists.newArrayList;
 
-public class EventSourceImpl<E> implements EventSource<E> {
+public class EventSourceImpl<E extends Event> implements EventSource<E> {
 
 	private final List<Consumer<E>> handlers = newArrayList();
 

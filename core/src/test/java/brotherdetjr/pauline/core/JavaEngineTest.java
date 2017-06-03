@@ -25,7 +25,6 @@ public class JavaEngineTest {
 		List<Pair<Long, Long>> rendered = newArrayList();
 		EventSourceImpl<EventBase> eventSource = new EventSourceImpl<>();
 		new Engine.Builder<BiConsumer<Long, Long>, EventBase>(eventSource)
-			.sessionIdFunc(EventBase::getSessionId)
 			.rendererFactory(event -> (e, from) -> rendered.add(Pair.of(e, from)))
 			.initial(event -> completedFuture(event.getSessionId() != 4L ? event.getValue() : new S2()), Object.class)
 			.handle(EventImplChild.class).when(555L).with(event -> completedFuture(event.getValue2()))
@@ -74,7 +73,7 @@ public class JavaEngineTest {
 	@Getter
 	@RequiredArgsConstructor
 	@ToString
-	public static abstract class EventBase {
+	public static abstract class EventBase implements Event {
 		private final long sessionId;
 		private final long value;
 	}

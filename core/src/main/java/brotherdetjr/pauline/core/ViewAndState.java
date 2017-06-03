@@ -5,11 +5,11 @@ import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
 @Getter
-public class ViewAndState<State, Renderer, E> {
+public class ViewAndState<State, Renderer, E extends Event> {
 	private final View<State, Renderer, E> view;
 	private final State state;
 
-	public static <S, R, E> ViewAndState<S, R, E> of(View<S, R, E> view, S state) {
+	public static <S, R, E extends Event> ViewAndState<S, R, E> of(View<S, R, E> view, S state) {
 		return new ViewAndState<>(view, state);
 	}
 

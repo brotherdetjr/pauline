@@ -4,7 +4,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 @FunctionalInterface
-public interface View<State, Renderer, E> {
+public interface View<State, Renderer, E extends Event> {
 	void render(Context<State, Renderer, E> context);
 
 	@Getter

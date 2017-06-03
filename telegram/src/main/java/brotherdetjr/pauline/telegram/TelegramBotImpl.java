@@ -1,5 +1,7 @@
 package brotherdetjr.pauline.telegram;
 
+import brotherdetjr.pauline.telegram.events.EventFactory;
+import brotherdetjr.pauline.telegram.events.TelegramEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.api.objects.Update;
@@ -14,7 +16,7 @@ public class TelegramBotImpl extends TelegramLongPollingBot {
 
 	private final String token;
 	private final String name;
-	private final AtomicReference<Consumer<Update>> ref;
+	private final AtomicReference<Consumer<TelegramEvent>> ref;
 
 	@Override
 	public String getBotToken() {
@@ -22,9 +24,20 @@ public class TelegramBotImpl extends TelegramLongPollingBot {
 	}
 
 	@Override
-	public void onUpdateReceived(Update event) {
-		log.debug("Firing event: {}", event);
-		ref.get().accept(event);
+	public void onUpdateReceived(Update update) {
+		log.debug("Received update: {}", update);
+		TelegramEvent event = EventFactory.of(update);
+		if (event != null) {
+			Consumer<TelegramEvent> consumer = ref.get();
+			if (consumer != null) {
+				log.debug("Firing event: {}", event);
+				consumer.accept(event);
+			} else {
+				log.warn("No consumer yet");
+			}
+		} else {
+			log.debug("Could not translate update to event");
+		}
 	}
 
 	@Override
