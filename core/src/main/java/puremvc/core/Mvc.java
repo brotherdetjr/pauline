@@ -25,8 +25,9 @@ import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
 
-public class Mvc<Renderer, E extends Event> {
+public class Mvc<Renderer, E> {
 	private final EventSource<E> eventSource;
+	private final Function<E, Long> sessionIdFunc;
 	private final Dispatcher<E> dispatcher;
 	private final View<Throwable, Renderer, E> failView;
 	private final Executor executor;
@@ -36,6 +37,7 @@ public class Mvc<Renderer, E extends Event> {
 	private final Logger log;
 
 	public Mvc(EventSource<E> eventSource,
+			   Function<E, Long> sessionIdFunc,
 			   Dispatcher<E> dispatcher,
 			   View<Throwable, Renderer, E> failView,
 			   Executor executor,
@@ -44,6 +46,7 @@ public class Mvc<Renderer, E extends Event> {
 			   Function<E, Renderer> rendererFactory,
 			   Logger log) {
 		this.eventSource = eventSource;
+		this.sessionIdFunc = sessionIdFunc;
 		this.dispatcher = dispatcher;
 		this.failView = failView;
 		this.executor = executor;
@@ -86,7 +89,7 @@ public class Mvc<Renderer, E extends Event> {
 	}
 
 	private void handle(E event) {
-		Long sessionId = event.getSessionId();
+		long sessionId = sessionIdFunc.apply(event);
 		synched(sessionId, session -> {
 			if (session != null) {
 				processIfNotBusy(event);
@@ -97,8 +100,9 @@ public class Mvc<Renderer, E extends Event> {
 		});
 	}
 
+	@SuppressWarnings("SuspiciousMethodCalls")
 	private void processIfNotBusy(E event) {
-		Session session = sessions.get(event.getSessionId());
+		Session session = sessions.get(sessionIdFunc.apply(event));
 		if (!session.isBusy()) {
 			Controller<Object, ?, E> controller = dispatcher.dispatch(event, session.getState());
 			session.setBusy(true);
@@ -111,7 +115,7 @@ public class Mvc<Renderer, E extends Event> {
 
 	private Session initSessionAndProcess(E event) {
 		Session session = new Session(null, true);
-		long sessionId = event.getSessionId();
+		long sessionId = sessionIdFunc.apply(event);
 		sessions.put(sessionId, session);
 		process(event, dispatcher.dispatch(event).transit(event));
 		return session;
@@ -129,7 +133,7 @@ public class Mvc<Renderer, E extends Event> {
 	}
 
 	private void freeSessionAndRender(E event, ViewAndState<?, Renderer, E> viewAndState) {
-		synched(event.getSessionId(), ignore -> {
+		synched(sessionIdFunc.apply(event), ignore -> {
 			try {
 				freeSession(event, viewAndState);
 				viewAndState.render(rendererFactory.apply(event), event);
@@ -142,12 +146,13 @@ public class Mvc<Renderer, E extends Event> {
 	}
 
 	private void freeSession(E event, ViewAndState<?, Renderer, E> viewAndState) {
-		Session session = sessions.get(event.getSessionId());
+		Long sessionId = sessionIdFunc.apply(event);
+		Session session = sessions.get(sessionId);
 		session.setState(viewAndState.getState());
 		session.setBusy(false);
 		log.debug(
 			"Set new state for session {}: {}. View key: {}",
-			event.getSessionId(),
+			sessionId,
 			viewAndState.getState(),
 			viewAndState.getState().getClass().getName()
 		);
@@ -164,8 +169,9 @@ public class Mvc<Renderer, E extends Event> {
 	}
 
 	@RequiredArgsConstructor
-	public static class Builder<Renderer, E extends Event> {
+	public static class Builder<Renderer, E> {
 		private final EventSource<E> eventSource;
+		private Function<E, Long> sessionIdFunc;
 		private Map<Class<?>, View<?, Renderer, E>> views = newHashMap();
 		private ControllerRegistry<E> controllers = new ControllerRegistry<>();
 		private View<Throwable, Renderer, E> failView;
@@ -179,7 +185,7 @@ public class Mvc<Renderer, E extends Event> {
 
 		@RequiredArgsConstructor
 		public class Handle<E1 extends E> {
-			private final Class<? extends Event> eventClass;
+			private final Class<?> eventClass;
 
 			public <From> Builder<Renderer, E> with(BiFunction<E1, From, CompletableFuture<?>> func) {
 				return new When<From>().with(func);
@@ -267,7 +273,7 @@ public class Mvc<Renderer, E extends Event> {
 
 		@SuppressWarnings("unchecked")
 		public <E1 extends E> Handle<E1> handle() {
-			return new Handle<E1>(Event.class);
+			return new Handle<E1>(Object.class);
 		}
 
 		public <To> Builder<Renderer, E> initialController(Controller<Void, To, E> initial) {
@@ -282,6 +288,11 @@ public class Mvc<Renderer, E extends Event> {
 					return toViewAndState(func.apply(e));
 				}
 			});
+		}
+
+		public Builder<Renderer, E> sessionIdFunc(Function<E, Long> sessionIdFunc) {
+			this.sessionIdFunc = sessionIdFunc;
+			return this;
 		}
 
 		public <To> Builder<Renderer, E> initial(
@@ -328,9 +339,10 @@ public class Mvc<Renderer, E extends Event> {
 		}
 
 		public Mvc<Renderer, E> build(boolean initialized) {
-			checkNotNull(rendererFactory, initial, failView);
+			checkNotNull(rendererFactory, sessionIdFunc, initial, failView);
 			Mvc<Renderer, E> mvc = new Mvc<>(
 				eventSource,
+				sessionIdFunc,
 				newDispatcher(),
 				failView,
 				executor,

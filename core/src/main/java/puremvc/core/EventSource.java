@@ -2,6 +2,6 @@ package puremvc.core;
 
 import java.util.function.Consumer;
 
-public interface EventSource<E extends Event> {
+public interface EventSource<E> {
 	void onEvent(Consumer<E> handler);
 }

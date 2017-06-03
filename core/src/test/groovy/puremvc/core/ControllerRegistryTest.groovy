@@ -86,11 +86,13 @@ class ControllerRegistryTest extends Specification {
 		E2_2       | String   | null
 	}
 
-	class E1 implements Event {
+	class Event {}
+
+	class E1 extends Event {
 		long sessionId
 	}
 
-	class E1_2 implements Event {
+	class E1_2 extends Event {
 		long sessionId
 	}
 

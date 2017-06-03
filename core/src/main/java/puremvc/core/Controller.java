@@ -3,7 +3,7 @@ package puremvc.core;
 import java.util.concurrent.CompletableFuture;
 
 @FunctionalInterface
-public interface Controller<From, To, E extends Event> {
+public interface Controller<From, To, E> {
 
 	<Renderer> CompletableFuture<ViewAndState<To, Renderer, E>> transit(E event, From state);
 

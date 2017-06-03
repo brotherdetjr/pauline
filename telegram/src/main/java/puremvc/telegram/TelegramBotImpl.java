@@ -14,7 +14,7 @@ public class TelegramBotImpl extends TelegramLongPollingBot {
 
 	private final String token;
 	private final String name;
-	private final AtomicReference<Consumer<TelegramEvent>> ref;
+	private final AtomicReference<Consumer<Update>> ref;
 
 	@Override
 	public String getBotToken() {
@@ -22,8 +22,7 @@ public class TelegramBotImpl extends TelegramLongPollingBot {
 	}
 
 	@Override
-	public void onUpdateReceived(Update update) {
-		TelegramEvent event = TelegramEvent.of(update);
+	public void onUpdateReceived(Update event) {
 		log.debug("Firing event: {}", event);
 		ref.get().accept(event);
 	}

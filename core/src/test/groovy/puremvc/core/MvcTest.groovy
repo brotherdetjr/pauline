@@ -40,6 +40,7 @@ class MvcTest extends Specification {
 		def barriers = new BlockingVariables()
 		new Mvc.Builder(eventSource)
 			.executor(EXECUTORS[executorName])
+			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView({ throw new Exception() })
 			.rendererFactory({ renderer })
 			.initial({ completedFuture 29L })
@@ -107,6 +108,7 @@ class MvcTest extends Specification {
 		def mockedLog = Mock(Logger)
 		new Mvc.Builder(eventSource)
 			.executor(EXECUTORS[executorName])
+			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView(
 				{ View.Context<Long, BiConsumer<String, Long>, EventImpl> ctx ->
 					//noinspection GroovyAssignabilityCheck
@@ -150,6 +152,7 @@ class MvcTest extends Specification {
 		def eventSource = new EventSourceImpl()
 		def mockedLog = Mock(Logger)
 		new Mvc.Builder(eventSource)
+			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView({ -> })
 			.rendererFactory({ EventImpl e -> { -> } })
 			.initial({ -> })
@@ -168,6 +171,7 @@ class MvcTest extends Specification {
 		def mockedLog = Mock(Logger)
 		new Mvc.Builder(eventSource)
 			.executor({ throw new Exception() })
+			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView({ -> })
 			.rendererFactory({ EventImpl e -> { -> } })
 			.initial({ -> })
@@ -185,6 +189,7 @@ class MvcTest extends Specification {
 		def eventSource = new EventSourceImpl()
 		def mockedLog = Mock(Logger)
 		new Mvc.Builder(eventSource)
+			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView({ -> })
 			.rendererFactory({ EventImpl e -> { -> } })
 			.initial({ -> })
@@ -207,6 +212,7 @@ class MvcTest extends Specification {
 		def mockedLog = Mock(Logger)
 		def failView = Mock(View)
 		new Mvc.Builder(eventSource)
+			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView(failView)
 			.rendererFactory({ EventImpl e -> { -> } })
 			.initial({ -> })
@@ -228,6 +234,7 @@ class MvcTest extends Specification {
 		def eventSource = new EventSourceImpl()
 		def mockedLog = Mock(Logger)
 		new Mvc.Builder(eventSource)
+			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView(Mock(View) {
 				render(_ as View.Context) >> { throw new Exception() }
 			})
@@ -260,6 +267,7 @@ class MvcTest extends Specification {
 				}
 		}
 		new Mvc.Builder(eventSource)
+			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.initial({ completedFuture nextState })
 			.rendererFactory({ EventImpl e -> { -> } })
 			.failView({ -> })
@@ -271,7 +279,7 @@ class MvcTest extends Specification {
 		!failed
 	}
 
-	static class EventImpl implements Event {
+	static class EventImpl {
 		long sessionId
 		long chatId
 		long value
