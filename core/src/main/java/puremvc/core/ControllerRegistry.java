@@ -11,24 +11,26 @@ import static com.google.common.collect.Maps.newHashMap;
 
 public class ControllerRegistry<E> {
 
-	private final Map<Anchor<?, ?>, Controller<?, ?, ? extends E>> registry = newHashMap();
+	private final Map<Anchor<? extends E, ?>, Controller<?, ?, ? extends E>> registry = newHashMap();
 
-	public <S> void put(Class<? extends E> eventClass, S state, Controller<?, ?, ? extends E> controller) {
+	public <From, To, E1 extends E> void put(Class<E1> eventClass, From state, Controller<From, To, E1> controller) {
 		registry.put(Anchor.of(eventClass, state), controller);
 	}
 
-	public void put(Class<? extends E> eventClass, Controller<?, ?, ? extends E> controller) {
+	public <From, To, E1 extends E> void put(Class<E1> eventClass, Controller<From, To, E1> controller) {
 		registry.put(Anchor.of(eventClass), controller);
 	}
 
-	public <S> void put(Class<? extends E> eventClass, Class<S> stateClass, Controller<?, ?, ? extends E> controller) {
+	public <From, To, E1 extends E> void put(
+		Class<E1> eventClass, Class<From> stateClass, Controller<From, To, E1> controller) {
 		registry.put(Anchor.of(eventClass, stateClass), controller);
 	}
 
-	public <From, To> Controller<From, To, E> get(Class<?> eventClass, From state) {
-		Class<?> clazz = eventClass;
+	@SuppressWarnings("unchecked")
+	public <From, To, E1 extends E> Controller<From, To, E1> get(Class<E1> eventClass, From state) {
+		Class<E1> clazz = eventClass;
 		while (clazz != null) {
-			Controller<From, To, E> controller = getController(clazz, state);
+			Controller<From, To, E1> controller = getController(clazz, state);
 			if (controller != null) {
 				return controller;
 			}
@@ -37,33 +39,31 @@ public class ControllerRegistry<E> {
 				return controller;
 			}
 			controller = getController(clazz);
-		if (controller != null) {
+			if (controller != null) {
 				return controller;
 			}
-			clazz = getParent(clazz);
+			clazz = (Class<E1>) getParent(clazz);
 		}
 		return null;
 	}
 
-	@SuppressWarnings("unchecked")
-	private static Class<?> getParent(Class<?> eventClass) {
-		eventClass = eventClass.getSuperclass();
-		return Object.class.equals(eventClass) ? Object.class : eventClass;
+	private static <E> Class<? super E> getParent(Class<E> eventClass) {
+		return eventClass.getSuperclass();
 	}
 
 	@SuppressWarnings("unchecked")
-	private <From, To> Controller<From, To, E> getController(Class<?> eventClass, From state) {
-		return (Controller<From, To, E>) registry.get(Anchor.of(eventClass, state));
+	private <From, To, E1 extends E> Controller<From, To, E1> getController(Class<E1> eventClass, From state) {
+		return (Controller<From, To, E1>) registry.get(Anchor.of(eventClass, state));
 	}
 
 	@SuppressWarnings("unchecked")
-	private <From, To> Controller<From, To, E> getController(Class<?> eventClass, Class<?> stateClass) {
-		return searchInHierarchy(stateClass, c -> (Controller<From, To, E>) registry.get(Anchor.of(eventClass, c)));
+	private <From, To, E1 extends E> Controller<From, To, E1> getController(Class<E1> eventClass, Class<?> stateClass) {
+		return searchInHierarchy(stateClass, c -> (Controller<From, To, E1>) registry.get(Anchor.of(eventClass, c)));
 	}
 
 	@SuppressWarnings("unchecked")
-	private <From, To> Controller<From, To, E> getController(Class<?> eventClass) {
-		return (Controller<From, To, E>) registry.get(Anchor.of(eventClass));
+	private <From, To, E1 extends E> Controller<From, To, E1> getController(Class<E1> eventClass) {
+		return (Controller<From, To, E1>) registry.get(Anchor.of(eventClass));
 	}
 
 	@RequiredArgsConstructor

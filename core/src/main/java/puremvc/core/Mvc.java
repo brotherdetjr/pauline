@@ -185,7 +185,7 @@ public class Mvc<Renderer, E> {
 
 		@RequiredArgsConstructor
 		public class Handle<E1 extends E> {
-			private final Class<?> eventClass;
+			private final Class<E1> eventClass;
 
 			public <From> Builder<Renderer, E> with(BiFunction<E1, From, CompletableFuture<?>> func) {
 				return new When<From>().with(func);
@@ -234,7 +234,7 @@ public class Mvc<Renderer, E> {
 							return toViewAndState((CompletableFuture<To>) func.apply(e, s));
 						}
 					};
-					Class<E> eventClass = (Class<E>) Handle.this.eventClass;
+					Class<E1> eventClass = Handle.this.eventClass;
 					if (state != null) {
 						controllers.put(eventClass, state, controller);
 					} else if (stateClass != null) {
@@ -273,7 +273,7 @@ public class Mvc<Renderer, E> {
 
 		@SuppressWarnings("unchecked")
 		public <E1 extends E> Handle<E1> handle() {
-			return new Handle<E1>(Object.class);
+			return new Handle<>((Class<E1>) Object.class);
 		}
 
 		public <To> Builder<Renderer, E> initialController(Controller<Void, To, E> initial) {
@@ -365,13 +365,15 @@ public class Mvc<Renderer, E> {
 			return new Dispatcher<E>() {
 				@SuppressWarnings("unchecked")
 				@Override
-				public <From> Controller<From, ?, E> dispatch(E event, From state) {
+				public <From, To> Controller<From, To, E> dispatch(E event, From state) {
 					if (state != null) {
-						return requireNonNull(controllers.get(event.getClass(), state),
+						return requireNonNull(
+							controllers.get((Class<E>) event.getClass(), state),
 							() -> "No controller registered for state " + state +
-								" and event class " + event.getClass().getName());
+								" and event class " + event.getClass().getName()
+						);
 					} else {
-						return (Controller<From, ?, E>) initial;
+						return (Controller<From, To, E>) initial;
 					}
 				}
 			};
