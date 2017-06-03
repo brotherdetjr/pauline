@@ -16,7 +16,7 @@ import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.junit.Assert.assertThat;
 
-public class JavaMvcTest {
+public class JavaEngineTest {
 
 	private volatile boolean failed;
 
@@ -24,7 +24,7 @@ public class JavaMvcTest {
 	public void toEnsureGenericsWorkCorrectly() {
 		List<Pair<Long, Long>> rendered = newArrayList();
 		EventSourceImpl<EventBase> eventSource = new EventSourceImpl<>();
-		new Mvc.Builder<BiConsumer<Long, Long>, EventBase>(eventSource)
+		new Engine.Builder<BiConsumer<Long, Long>, EventBase>(eventSource)
 			.sessionIdFunc(EventBase::getSessionId)
 			.rendererFactory(event -> (e, from) -> rendered.add(Pair.of(e, from)))
 			.initial(event -> completedFuture(event.getSessionId() != 4L ? event.getValue() : new S2()), Object.class)

@@ -25,7 +25,7 @@ import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
 
-public class Mvc<Renderer, E> {
+public class Engine<Renderer, E> {
 	private final EventSource<E> eventSource;
 	private final Function<E, Long> sessionIdFunc;
 	private final Dispatcher<E> dispatcher;
@@ -36,15 +36,15 @@ public class Mvc<Renderer, E> {
 	private final Striped<Lock> striped;
 	private final Logger log;
 
-	public Mvc(EventSource<E> eventSource,
-			   Function<E, Long> sessionIdFunc,
-			   Dispatcher<E> dispatcher,
-			   View<Throwable, Renderer, E> failView,
-			   Executor executor,
-			   Map<Long, Session> sessions,
-			   int stripes,
-			   Function<E, Renderer> rendererFactory,
-			   Logger log) {
+	public Engine(EventSource<E> eventSource,
+				  Function<E, Long> sessionIdFunc,
+				  Dispatcher<E> dispatcher,
+				  View<Throwable, Renderer, E> failView,
+				  Executor executor,
+				  Map<Long, Session> sessions,
+				  int stripes,
+				  Function<E, Renderer> rendererFactory,
+				  Logger log) {
 		this.eventSource = eventSource;
 		this.sessionIdFunc = sessionIdFunc;
 		this.dispatcher = dispatcher;
@@ -179,7 +179,7 @@ public class Mvc<Renderer, E> {
 		private Map<Long, Session> sessions = newConcurrentMap();
 		private int stripes = 1000;
 		private Function<E, Renderer> rendererFactory;
-		private Logger log = LoggerFactory.getLogger(Mvc.class);
+		private Logger log = LoggerFactory.getLogger(Engine.class);
 
 		private Controller<?, ?, E> initial;
 
@@ -338,9 +338,9 @@ public class Mvc<Renderer, E> {
 			return this;
 		}
 
-		public Mvc<Renderer, E> build(boolean initialized) {
+		public Engine<Renderer, E> build(boolean initialized) {
 			checkNotNull(rendererFactory, sessionIdFunc, initial, failView);
-			Mvc<Renderer, E> mvc = new Mvc<>(
+			Engine<Renderer, E> engine = new Engine<>(
 				eventSource,
 				sessionIdFunc,
 				newDispatcher(),
@@ -352,12 +352,12 @@ public class Mvc<Renderer, E> {
 				log
 			);
 			if (initialized) {
-				mvc.init();
+				engine.init();
 			}
-			return mvc;
+			return engine;
 		}
 
-		public Mvc<Renderer, E> build() {
+		public Engine<Renderer, E> build() {
 			return build(true);
 		}
 

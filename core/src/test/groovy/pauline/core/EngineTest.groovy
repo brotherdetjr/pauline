@@ -18,7 +18,7 @@ import static java.util.concurrent.Executors.newFixedThreadPool
 
 @Slf4j
 @Timeout(2)
-class MvcTest extends Specification {
+class EngineTest extends Specification {
 	static final
 		SESSION_1 = 2L,
 		SESSION_2 = 22L,
@@ -38,7 +38,7 @@ class MvcTest extends Specification {
 		def eventSource = new EventSourceImpl()
 		def renderer = Mock(BiConsumer)
 		def barriers = new BlockingVariables()
-		new Mvc.Builder(eventSource)
+		new Engine.Builder(eventSource)
 			.executor(EXECUTORS[executorName])
 			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView({ throw new Exception() })
@@ -106,7 +106,7 @@ class MvcTest extends Specification {
 			completedFuture null
 		}
 		def mockedLog = Mock(Logger)
-		new Mvc.Builder(eventSource)
+		new Engine.Builder(eventSource)
 			.executor(EXECUTORS[executorName])
 			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView(
@@ -151,7 +151,7 @@ class MvcTest extends Specification {
 		given:
 		def eventSource = new EventSourceImpl()
 		def mockedLog = Mock(Logger)
-		new Mvc.Builder(eventSource)
+		new Engine.Builder(eventSource)
 			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView({ -> })
 			.rendererFactory({ EventImpl e -> { -> } })
@@ -169,7 +169,7 @@ class MvcTest extends Specification {
 		given:
 		def eventSource = new EventSourceImpl()
 		def mockedLog = Mock(Logger)
-		new Mvc.Builder(eventSource)
+		new Engine.Builder(eventSource)
 			.executor({ throw new Exception() })
 			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView({ -> })
@@ -188,7 +188,7 @@ class MvcTest extends Specification {
 		given:
 		def eventSource = new EventSourceImpl()
 		def mockedLog = Mock(Logger)
-		new Mvc.Builder(eventSource)
+		new Engine.Builder(eventSource)
 			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView({ -> })
 			.rendererFactory({ EventImpl e -> { -> } })
@@ -211,7 +211,7 @@ class MvcTest extends Specification {
 		def eventSource = new EventSourceImpl()
 		def mockedLog = Mock(Logger)
 		def failView = Mock(View)
-		new Mvc.Builder(eventSource)
+		new Engine.Builder(eventSource)
 			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView(failView)
 			.rendererFactory({ EventImpl e -> { -> } })
@@ -233,7 +233,7 @@ class MvcTest extends Specification {
 		given:
 		def eventSource = new EventSourceImpl()
 		def mockedLog = Mock(Logger)
-		new Mvc.Builder(eventSource)
+		new Engine.Builder(eventSource)
 			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.failView(Mock(View) {
 				render(_ as View.Context) >> { throw new Exception() }
@@ -266,7 +266,7 @@ class MvcTest extends Specification {
 					failed |= !trace.contains("No view defined for state class ${nextState.class.name}")
 				}
 		}
-		new Mvc.Builder(eventSource)
+		new Engine.Builder(eventSource)
 			.sessionIdFunc({ EventImpl e -> e.sessionId })
 			.initial({ completedFuture nextState })
 			.rendererFactory({ EventImpl e -> { -> } })
