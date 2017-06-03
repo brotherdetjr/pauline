@@ -1,4 +1,4 @@
-package brotherdetjr.pauline.core;
+package brotherdetjr.pauline.events;
 
 public interface Event {
 	long getSessionId();

@@ -1,5 +1,7 @@
 package brotherdetjr.pauline.core;
 
+import brotherdetjr.pauline.events.Event;
+import brotherdetjr.pauline.events.EventSource;
 import com.google.common.util.concurrent.Striped;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -25,7 +27,7 @@ import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
 
-public class Engine<Renderer, E extends Event> {
+public class Flow<Renderer, E extends Event> {
 	private final EventSource<E> eventSource;
 	private final Dispatcher<E> dispatcher;
 	private final View<Throwable, Renderer, E> failView;
@@ -35,14 +37,14 @@ public class Engine<Renderer, E extends Event> {
 	private final Striped<Lock> striped;
 	private final Logger log;
 
-	public Engine(EventSource<E> eventSource,
-				  Dispatcher<E> dispatcher,
-				  View<Throwable, Renderer, E> failView,
-				  Executor executor,
-				  Map<Long, Session> sessions,
-				  int stripes,
-				  Function<E, Renderer> rendererFactory,
-				  Logger log) {
+	public Flow(EventSource<E> eventSource,
+				Dispatcher<E> dispatcher,
+				View<Throwable, Renderer, E> failView,
+				Executor executor,
+				Map<Long, Session> sessions,
+				int stripes,
+				Function<E, Renderer> rendererFactory,
+				Logger log) {
 		this.eventSource = eventSource;
 		this.dispatcher = dispatcher;
 		this.failView = failView;
@@ -165,7 +167,7 @@ public class Engine<Renderer, E extends Event> {
 
 	@RequiredArgsConstructor
 	public static class Builder<Renderer, E extends Event> {
-		private final EventSource<E> eventSource;
+		private EventSource<E> eventSource;
 		private Map<Class<?>, View<?, Renderer, E>> views = newHashMap();
 		private ControllerRegistry<E> controllers = new ControllerRegistry<>();
 		private View<Throwable, Renderer, E> failView;
@@ -173,7 +175,7 @@ public class Engine<Renderer, E extends Event> {
 		private Map<Long, Session> sessions = newConcurrentMap();
 		private int stripes = 1000;
 		private Function<E, Renderer> rendererFactory;
-		private Logger log = LoggerFactory.getLogger(Engine.class);
+		private Logger log = LoggerFactory.getLogger(Flow.class);
 
 		private Controller<?, ?, E> initial;
 
@@ -295,6 +297,11 @@ public class Engine<Renderer, E extends Event> {
 			return new Render<>(asList(keys));
 		}
 
+		public Builder<Renderer, E> eventSource(EventSource<E> eventSource) {
+			this.eventSource = eventSource;
+			return this;
+		}
+
 		public Builder<Renderer, E> failView(View<Throwable, Renderer, E> failView) {
 			this.failView = failView;
 			return this;
@@ -327,9 +334,9 @@ public class Engine<Renderer, E extends Event> {
 			return this;
 		}
 
-		public Engine<Renderer, E> build(boolean initialized) {
-			checkNotNull(rendererFactory, initial, failView);
-			Engine<Renderer, E> engine = new Engine<>(
+		public Flow<Renderer, E> build(boolean initialized) {
+			checkNotNull(rendererFactory, eventSource, initial, failView);
+			Flow<Renderer, E> flow = new Flow<>(
 				eventSource,
 				newDispatcher(),
 				failView,
@@ -340,12 +347,12 @@ public class Engine<Renderer, E extends Event> {
 				log
 			);
 			if (initialized) {
-				engine.init();
+				flow.init();
 			}
-			return engine;
+			return flow;
 		}
 
-		public Engine<Renderer, E> build() {
+		public Flow<Renderer, E> build() {
 			return build(true);
 		}
 

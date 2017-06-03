@@ -1,5 +1,7 @@
 package brotherdetjr.pauline.core;
 
+import brotherdetjr.pauline.events.Event;
+
 import java.util.concurrent.CompletableFuture;
 
 @FunctionalInterface

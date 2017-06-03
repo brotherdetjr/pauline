@@ -1,5 +1,7 @@
 package brotherdetjr.pauline.core
 
+import brotherdetjr.pauline.events.Event
+import brotherdetjr.pauline.test.EventSourceImpl
 import groovy.util.logging.Slf4j
 import org.slf4j.Logger
 import spock.lang.Specification
@@ -18,7 +20,7 @@ import static java.util.concurrent.Executors.newFixedThreadPool
 
 @Slf4j
 @Timeout(2)
-class EngineTest extends Specification {
+class FlowTest extends Specification {
 	static final
 		SESSION_1 = 2L,
 		SESSION_2 = 22L,
@@ -38,7 +40,8 @@ class EngineTest extends Specification {
 		def eventSource = new EventSourceImpl()
 		def renderer = Mock(BiConsumer)
 		def barriers = new BlockingVariables()
-		new Engine.Builder(eventSource)
+		new Flow.Builder()
+			.eventSource(eventSource)
 			.executor(EXECUTORS[executorName])
 			.failView({ throw new Exception() })
 			.rendererFactory({ renderer })
@@ -105,7 +108,8 @@ class EngineTest extends Specification {
 			completedFuture null
 		}
 		def mockedLog = Mock(Logger)
-		new Engine.Builder(eventSource)
+		new Flow.Builder()
+			.eventSource(eventSource)
 			.executor(EXECUTORS[executorName])
 			.failView(
 				{ View.Context<Long, BiConsumer<String, Long>, EventImpl> ctx ->
@@ -149,7 +153,8 @@ class EngineTest extends Specification {
 		given:
 		def eventSource = new EventSourceImpl()
 		def mockedLog = Mock(Logger)
-		new Engine.Builder(eventSource)
+		new Flow.Builder()
+			.eventSource(eventSource)
 			.failView({ -> })
 			.rendererFactory({ EventImpl e -> { -> } })
 			.initial({ -> })
@@ -166,7 +171,8 @@ class EngineTest extends Specification {
 		given:
 		def eventSource = new EventSourceImpl()
 		def mockedLog = Mock(Logger)
-		new Engine.Builder(eventSource)
+		new Flow.Builder()
+			.eventSource(eventSource)
 			.executor({ throw new Exception() })
 			.failView({ -> })
 			.rendererFactory({ EventImpl e -> { -> } })
@@ -184,7 +190,8 @@ class EngineTest extends Specification {
 		given:
 		def eventSource = new EventSourceImpl()
 		def mockedLog = Mock(Logger)
-		new Engine.Builder(eventSource)
+		new Flow.Builder()
+			.eventSource(eventSource)
 			.failView({ -> })
 			.rendererFactory({ EventImpl e -> { -> } })
 			.initial({ -> })
@@ -206,7 +213,8 @@ class EngineTest extends Specification {
 		def eventSource = new EventSourceImpl()
 		def mockedLog = Mock(Logger)
 		def failView = Mock(View)
-		new Engine.Builder(eventSource)
+		new Flow.Builder()
+			.eventSource(eventSource)
 			.failView(failView)
 			.rendererFactory({ EventImpl e -> { -> } })
 			.initial({ -> })
@@ -227,7 +235,8 @@ class EngineTest extends Specification {
 		given:
 		def eventSource = new EventSourceImpl()
 		def mockedLog = Mock(Logger)
-		new Engine.Builder(eventSource)
+		new Flow.Builder()
+			.eventSource(eventSource)
 			.failView(Mock(View) {
 				render(_ as View.Context) >> { throw new Exception() }
 			})
@@ -259,7 +268,8 @@ class EngineTest extends Specification {
 					failed |= !trace.contains("No view defined for state class ${nextState.class.name}")
 				}
 		}
-		new Engine.Builder(eventSource)
+		new Flow.Builder()
+			.eventSource(eventSource)
 			.initial({ completedFuture nextState })
 			.rendererFactory({ EventImpl e -> { -> } })
 			.failView({ -> })

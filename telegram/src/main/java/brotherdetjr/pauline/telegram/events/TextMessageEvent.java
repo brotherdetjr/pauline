@@ -1,14 +1,13 @@
 package brotherdetjr.pauline.telegram.events;
 
-import org.telegram.telegrambots.api.objects.Update;
+import lombok.Getter;
 
+@Getter
 public class TextMessageEvent extends TelegramEvent {
+	private final String text;
 
-	public TextMessageEvent(Update underlying) {
-		super(underlying);
-	}
-
-	public String getText() {
-		return getMessage().getText();
+	public TextMessageEvent(long sessionId, String userName, long userId, long chatId, String text) {
+		super(sessionId, userName, userId, chatId);
+		this.text = text;
 	}
 }

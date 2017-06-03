@@ -1,5 +1,6 @@
 package brotherdetjr.pauline.core;
 
+import brotherdetjr.pauline.events.Event;
 import lombok.EqualsAndHashCode;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;

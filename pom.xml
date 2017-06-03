@@ -10,8 +10,10 @@
 	<packaging>pom</packaging>
 
 	<modules>
+		<module>events</module>
 		<module>core</module>
 		<module>telegram</module>
+		<module>test</module>
 	</modules>
 
 	<properties>
@@ -52,6 +54,23 @@
 
 	<dependencyManagement>
 		<dependencies>
+			<dependency>
+				<groupId>brotherdetjr</groupId>
+				<artifactId>brotherdetjr-pauline-core</artifactId>
+				<version>${parent.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>brotherdetjr</groupId>
+				<artifactId>brotherdetjr-pauline-events</artifactId>
+				<version>${parent.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>brotherdetjr</groupId>
+				<artifactId>brotherdetjr-pauline-test</artifactId>
+				<version>${parent.version}</version>
+				<scope>test</scope>
+			</dependency>
+
 			<dependency>
 				<groupId>brotherdetjr</groupId>
 				<artifactId>brotherdetjr-utils</artifactId>

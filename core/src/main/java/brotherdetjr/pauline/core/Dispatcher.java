@@ -1,5 +1,7 @@
 package brotherdetjr.pauline.core;
 
+import brotherdetjr.pauline.events.Event;
+
 @FunctionalInterface
 public interface Dispatcher<E extends Event> {
 

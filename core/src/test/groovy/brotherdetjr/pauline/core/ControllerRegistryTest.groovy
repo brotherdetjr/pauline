@@ -1,5 +1,6 @@
 package brotherdetjr.pauline.core
 
+import brotherdetjr.pauline.events.Event
 import spock.lang.Specification
 import spock.lang.Unroll
 

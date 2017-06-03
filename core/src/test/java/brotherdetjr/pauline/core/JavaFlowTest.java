@@ -1,5 +1,7 @@
 package brotherdetjr.pauline.core;
 
+import brotherdetjr.pauline.events.Event;
+import brotherdetjr.pauline.test.EventSourceImpl;
 import com.google.common.collect.ImmutableList;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +18,7 @@ import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.junit.Assert.assertThat;
 
-public class JavaEngineTest {
+public class JavaFlowTest {
 
 	private volatile boolean failed;
 
@@ -24,7 +26,8 @@ public class JavaEngineTest {
 	public void toEnsureGenericsWorkCorrectly() {
 		List<Pair<Long, Long>> rendered = newArrayList();
 		EventSourceImpl<EventBase> eventSource = new EventSourceImpl<>();
-		new Engine.Builder<BiConsumer<Long, Long>, EventBase>(eventSource)
+		new Flow.Builder<BiConsumer<Long, Long>, EventBase>()
+			.eventSource(eventSource)
 			.rendererFactory(event -> (e, from) -> rendered.add(Pair.of(e, from)))
 			.initial(event -> completedFuture(event.getSessionId() != 4L ? event.getValue() : new S2()), Object.class)
 			.handle(EventImplChild.class).when(555L).with(event -> completedFuture(event.getValue2()))

@@ -29,6 +29,16 @@
 		</dependency>
 
 		<dependency>
+			<groupId>brotherdetjr</groupId>
+			<artifactId>brotherdetjr-pauline-events</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>brotherdetjr</groupId>
+			<artifactId>brotherdetjr-pauline-test</artifactId>
+		</dependency>
+
+		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
 		</dependency>

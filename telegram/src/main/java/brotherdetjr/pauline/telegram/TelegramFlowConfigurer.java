@@ -1,35 +1,41 @@
 package brotherdetjr.pauline.telegram;
 
+import brotherdetjr.pauline.core.Flow;
 import brotherdetjr.pauline.telegram.events.TelegramEvent;
 import lombok.SneakyThrows;
+import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.ApiContextInitializer;
 import org.telegram.telegrambots.TelegramBotsApi;
-import org.telegram.telegrambots.api.objects.Update;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.exceptions.TelegramApiRequestException;
-import brotherdetjr.pauline.core.Engine;
 
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
-import static brotherdetjr.pauline.telegram.TelegramUtils.extractChatId;
-
+@UtilityClass
 @Slf4j
-public class TelegramEngine {
+public class TelegramFlowConfigurer {
+
+	private final static TelegramBotsApi telegramBotsApi = new TelegramBotsApi();
 
 	static {
 		ApiContextInitializer.init();
 	}
 
+	public static Flow.Builder<TelegramRenderer, TelegramEvent> flow() {
+		return new Flow.Builder<TelegramRenderer, TelegramEvent>().failView(new TelegramDefaultFailView());
+	}
+
 	@SneakyThrows(TelegramApiRequestException.class)
-	public static Engine.Builder<TelegramRenderer, TelegramEvent> builder(String token, String name) {
+	public static Flow.Builder<TelegramRenderer, TelegramEvent> configure(
+		Flow.Builder<TelegramRenderer, TelegramEvent> builder, String token, String name) {
 		AtomicReference<Consumer<TelegramEvent>> ref = new AtomicReference<>();
 		TelegramLongPollingBot bot = new TelegramBotImpl(token, name, ref);
-		new TelegramBotsApi().registerBot(bot);
-		return new Engine.Builder<TelegramRenderer, TelegramEvent>(ref::set)
-			.rendererFactory(e -> new TelegramRenderer(bot, e.getChatId()))
-			.failView(new TelegramDefaultFailView());
+		telegramBotsApi.registerBot(bot);
+		return builder
+			.eventSource(ref::set)
+			.rendererFactory(e -> new TelegramRendererImpl(bot, e.getChatId()));
 	}
 
 }
