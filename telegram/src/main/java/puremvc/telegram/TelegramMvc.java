@@ -2,6 +2,7 @@ package puremvc.telegram;
 
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.telegram.telegrambots.ApiContextInitializer;
 import org.telegram.telegrambots.TelegramBotsApi;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.exceptions.TelegramApiRequestException;
@@ -12,6 +13,10 @@ import java.util.function.Consumer;
 
 @Slf4j
 public class TelegramMvc {
+
+	static {
+		ApiContextInitializer.init();
+	}
 
 	@SneakyThrows(TelegramApiRequestException.class)
 	public static Mvc.Builder<TelegramRenderer, TelegramEvent> builder(String token, String name) {
