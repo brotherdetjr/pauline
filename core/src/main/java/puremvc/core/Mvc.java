@@ -268,7 +268,7 @@ public class Mvc<Renderer, E> {
 		}
 
 		public <E1 extends E> Handle<E1> handle(Class<E1> eventClass) {
-			return new Handle<E1>(eventClass);
+			return new Handle<>(eventClass);
 		}
 
 		@SuppressWarnings("unchecked")
