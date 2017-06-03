@@ -1,4 +1,4 @@
-package puremvc.telegram;
+package pauline.telegram;
 
 import brotherdetjr.utils.ExceptionWithValue;
 import lombok.experimental.UtilityClass;

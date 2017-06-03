@@ -1,4 +1,4 @@
-package puremvc.telegram;
+package pauline.telegram;
 
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -7,12 +7,12 @@ import org.telegram.telegrambots.TelegramBotsApi;
 import org.telegram.telegrambots.api.objects.Update;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.exceptions.TelegramApiRequestException;
-import puremvc.core.Mvc;
+import pauline.core.Mvc;
 
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
-import static puremvc.telegram.TelegramUtils.extractChatId;
+import static pauline.telegram.TelegramUtils.extractChatId;
 
 @Slf4j
 public class TelegramMvc {

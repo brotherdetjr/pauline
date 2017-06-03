@@ -1,4 +1,4 @@
-package puremvc.core;
+package pauline.core;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

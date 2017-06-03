@@ -5,12 +5,12 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
-		<groupId>puremvc</groupId>
-		<artifactId>puremvc-parent</artifactId>
+		<groupId>brotherdetjr</groupId>
+		<artifactId>brotherdetjr-pauline-parent</artifactId>
 		<version>1.0.0-SNAPSHOT</version>
 	</parent>
 
-	<artifactId>puremvc-core</artifactId>
+	<artifactId>brotherdetjr-pauline-core</artifactId>
 
 	<build>
 		<plugins>

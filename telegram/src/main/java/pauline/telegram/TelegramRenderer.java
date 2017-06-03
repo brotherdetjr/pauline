@@ -1,4 +1,4 @@
-package puremvc.telegram;
+package pauline.telegram;
 
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;

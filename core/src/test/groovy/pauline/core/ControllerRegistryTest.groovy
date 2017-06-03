@@ -1,4 +1,4 @@
-package puremvc.core
+package pauline.core
 
 import spock.lang.Specification
 import spock.lang.Unroll

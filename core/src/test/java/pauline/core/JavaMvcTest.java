@@ -1,4 +1,4 @@
-package puremvc.core;
+package pauline.core;
 
 import com.google.common.collect.ImmutableList;
 import lombok.Getter;

@@ -1,4 +1,4 @@
-package puremvc.core;
+package pauline.core;
 
 @FunctionalInterface
 public interface Dispatcher<E> {

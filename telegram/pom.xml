@@ -5,12 +5,12 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
-		<groupId>puremvc</groupId>
-		<artifactId>puremvc-parent</artifactId>
+		<groupId>brotherdetjr</groupId>
+		<artifactId>brotherdetjr-pauline-parent</artifactId>
 		<version>1.0.0-SNAPSHOT</version>
 	</parent>
 
-	<artifactId>puremvc-telegram</artifactId>
+	<artifactId>brotherdetjr-pauline-telegram</artifactId>
 
 	<build>
 		<plugins>
@@ -23,8 +23,8 @@
 
 	<dependencies>
 		<dependency>
-			<groupId>puremvc</groupId>
-			<artifactId>puremvc-core</artifactId>
+			<groupId>brotherdetjr</groupId>
+			<artifactId>brotherdetjr-pauline-core</artifactId>
 			<version>${parent.version}</version>
 		</dependency>
 
