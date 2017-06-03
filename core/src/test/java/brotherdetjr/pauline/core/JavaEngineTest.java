@@ -1,4 +1,4 @@
-package pauline.core;
+package brotherdetjr.pauline.core;
 
 import com.google.common.collect.ImmutableList;
 import lombok.Getter;

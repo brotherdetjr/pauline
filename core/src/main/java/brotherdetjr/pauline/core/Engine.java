@@ -1,4 +1,4 @@
-package pauline.core;
+package brotherdetjr.pauline.core;
 
 import com.google.common.util.concurrent.Striped;
 import lombok.RequiredArgsConstructor;

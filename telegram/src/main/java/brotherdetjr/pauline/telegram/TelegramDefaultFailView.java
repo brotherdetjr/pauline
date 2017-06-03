@@ -1,8 +1,8 @@
-package pauline.telegram;
+package brotherdetjr.pauline.telegram;
 
 import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.api.objects.Update;
-import pauline.core.View;
+import brotherdetjr.pauline.core.View;
 
 import java.util.UUID;
 

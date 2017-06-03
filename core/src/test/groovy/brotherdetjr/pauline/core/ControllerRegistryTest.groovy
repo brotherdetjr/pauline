@@ -1,4 +1,4 @@
-package pauline.core
+package brotherdetjr.pauline.core
 
 import spock.lang.Specification
 import spock.lang.Unroll

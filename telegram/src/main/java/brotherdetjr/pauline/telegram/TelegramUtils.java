@@ -1,4 +1,4 @@
-package pauline.telegram;
+package brotherdetjr.pauline.telegram;
 
 import brotherdetjr.utils.ExceptionWithValue;
 import lombok.experimental.UtilityClass;

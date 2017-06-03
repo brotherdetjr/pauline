@@ -1,4 +1,4 @@
-package pauline.core;
+package brotherdetjr.pauline.core;
 
 import java.util.concurrent.CompletableFuture;
 

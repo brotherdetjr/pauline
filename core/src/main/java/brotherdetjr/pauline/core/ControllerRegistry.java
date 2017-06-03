@@ -1,4 +1,4 @@
-package pauline.core;
+package brotherdetjr.pauline.core;
 
 import lombok.EqualsAndHashCode;
 import lombok.RequiredArgsConstructor;

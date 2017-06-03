@@ -1,4 +1,4 @@
-package pauline.core
+package brotherdetjr.pauline.core
 
 import groovy.util.logging.Slf4j
 import org.slf4j.Logger
