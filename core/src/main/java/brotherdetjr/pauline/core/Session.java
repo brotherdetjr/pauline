@@ -10,6 +10,6 @@ import lombok.ToString;
 @AllArgsConstructor
 @ToString
 public class Session {
-    private volatile Object state;
-    private volatile boolean busy;
+	private volatile Object state;
+	private volatile boolean busy;
 }
