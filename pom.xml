@@ -13,6 +13,7 @@
 		<module>events</module>
 		<module>core</module>
 		<module>telegram</module>
+		<module>telegram-test</module>
 		<module>test</module>
 	</modules>
 
@@ -69,6 +70,11 @@
 				<artifactId>brotherdetjr-pauline-test</artifactId>
 				<version>${parent.version}</version>
 				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>brotherdetjr</groupId>
+				<artifactId>brotherdetjr-pauline-telegram</artifactId>
+				<version>${parent.version}</version>
 			</dependency>
 
 			<dependency>
