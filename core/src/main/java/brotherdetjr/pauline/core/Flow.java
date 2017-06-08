@@ -4,6 +4,7 @@ import brotherdetjr.pauline.events.Event;
 import brotherdetjr.pauline.events.EventSource;
 import com.google.common.util.concurrent.Striped;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,6 +24,7 @@ import static com.google.common.base.Throwables.getStackTraceAsString;
 import static com.google.common.collect.Maps.newConcurrentMap;
 import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static java.lang.Boolean.TRUE;
 import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
@@ -32,7 +34,7 @@ public class Flow<Renderer, E extends Event> {
 	private final Dispatcher<E> dispatcher;
 	private final View<Throwable, Renderer, E> failView;
 	private final Executor executor;
-	private final Map<Long, Session> sessions;
+	private final SessionStorage sessionStorage;
 	private final Function<E, Renderer> rendererFactory;
 	private final Striped<Lock> striped;
 	private final Logger log;
@@ -41,7 +43,7 @@ public class Flow<Renderer, E extends Event> {
 				Dispatcher<E> dispatcher,
 				View<Throwable, Renderer, E> failView,
 				Executor executor,
-				Map<Long, Session> sessions,
+				SessionStorage sessionStorage,
 				int stripes,
 				Function<E, Renderer> rendererFactory,
 				Logger log) {
@@ -49,7 +51,7 @@ public class Flow<Renderer, E extends Event> {
 		this.dispatcher = dispatcher;
 		this.failView = failView;
 		this.executor = executor;
-		this.sessions = sessions;
+		this.sessionStorage = sessionStorage;
 		this.rendererFactory = rendererFactory;
 		striped = Striped.lock(stripes);
 		this.log = log;
@@ -99,17 +101,48 @@ public class Flow<Renderer, E extends Event> {
 		});
 	}
 
-	@SuppressWarnings("SuspiciousMethodCalls")
 	private void processIfNotBusy(E event) {
-		Session session = sessions.get(event.getSessionId());
-		if (!session.isBusy()) {
-			Controller<Object, ?, E> controller = dispatcher.dispatch(event, session.getState());
-			session.setBusy(true);
-			process(event, controller.transit(event, session.getState()));
+		sessionStorage
+			.acquireLock(event.getSessionId())
+			.whenComplete((ignore, ex) -> onLockAcquired(event, ex));
+	}
+
+	private void onLockAcquired(E event, Throwable ex) {
+		long sessionId = event.getSessionId();
+		if (ex == null) {
+			sessionStorage.getState(sessionId)
+				.whenComplete((state, ex1) -> onStateRetrieved(event, state, ex1));
 		} else {
-			log.error("Looks like somebody spamming us. Event: {}", event);
-			renderFail(new IllegalStateException("Wait, not so fast!"), event);
+			if (ex instanceof SpamException) {
+				log.error("Looks like somebody spamming us. Event queue size: {}, sessionID: {}",
+					((SpamException) ex).getEventQueue().size(), sessionId);
+				renderFail(new IllegalStateException("Wait, not so fast!"), event);
+			} else {
+				log.error("Failed to acquire session lock. Session ID: " + sessionId, ex);
+				renderFail(ex, event);
+			}
 		}
+	}
+
+	private <T> void onStateRetrieved(E event, T state, Throwable ex) {
+		if (ex == null) {
+			sessionStorage.getVars(event.getSessionId())
+				.whenComplete((vars, ex1) -> onVarsRetrieved(event, Session.of(state, vars), ex1));
+		} else {
+			log.error("Failed to get session state. Session ID: " + event.getSessionId(), ex);
+			renderFail(ex, event);
+		}
+	}
+
+	private <T> void onVarsRetrieved(E event, Session<T> session, Throwable ex) {
+		if (ex == null) {
+			Controller<T, ?, E> controller = dispatcher.dispatch(event, session);
+			process(event, controller.transit(event, session));
+		} else {
+			log.error("Failed to get session vars. Session ID: " + event.getSessionId(), ex);
+			renderFail(ex, event);
+		}
+
 	}
 
 	private Session initSessionAndProcess(E event) {
