@@ -4,6 +4,8 @@ import brotherdetjr.pauline.events.Event;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
+import java.util.concurrent.CompletableFuture;
+
 @RequiredArgsConstructor
 @Getter
 public class ViewAndSession<State, Renderer, E extends Event> {
@@ -14,7 +16,7 @@ public class ViewAndSession<State, Renderer, E extends Event> {
 		return new ViewAndSession<>(view, session);
 	}
 
-	public void render(Renderer renderer, E event) {
-		view.render(View.Context.of(session, renderer, event));
+	public CompletableFuture<Void> render(Renderer renderer, E event) {
+		return view.render(View.Context.of(session, renderer, event));
 	}
 }

@@ -1,5 +1,6 @@
 package brotherdetjr.pauline.core;
 
+import com.google.common.collect.ImmutableMap;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.tuple.Pair;
@@ -29,5 +30,9 @@ public class Session<T> {
 
 	public <V> V getVar(String key, Class<V> probe) {
 		return (V) fromNullable(newVars.get(key)).or(vars.get(key));
+	}
+
+	public Map<String, ?> getVars() {
+		return ImmutableMap.copyOf(newVars);
 	}
 }

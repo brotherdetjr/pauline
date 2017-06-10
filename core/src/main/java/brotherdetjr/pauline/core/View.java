@@ -4,9 +4,11 @@ import brotherdetjr.pauline.events.Event;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
+import java.util.concurrent.CompletableFuture;
+
 @FunctionalInterface
 public interface View<State, Renderer, E extends Event> {
-	void render(Context<State, Renderer, E> context);
+	CompletableFuture<Void> render(Context<State, Renderer, E> context);
 
 	@RequiredArgsConstructor
 	class Context<State, Renderer, E> {
