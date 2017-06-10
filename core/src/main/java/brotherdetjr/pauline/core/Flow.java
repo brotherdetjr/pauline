@@ -24,7 +24,6 @@ import static com.google.common.base.Throwables.getStackTraceAsString;
 import static com.google.common.collect.Maps.newConcurrentMap;
 import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static java.lang.Boolean.TRUE;
 import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
@@ -102,47 +101,68 @@ public class Flow<Renderer, E extends Event> {
 	}
 
 	private void processIfNotBusy(E event) {
-		sessionStorage
-			.acquireLock(event.getSessionId())
-			.whenComplete((ignore, ex) -> onLockAcquired(event, ex));
+		try {
+			sessionStorage
+				.acquireLock(event.getSessionId())
+				.whenComplete((ignore, ex) -> onLockAcquired(event, ex));
+		} catch (Throwable ex) {
+			handleLockAcquisitionFailure(ex, event);
+		}
 	}
 
 	private void onLockAcquired(E event, Throwable ex) {
+		if (ex == null) {
+			try {
+				sessionStorage.getStateAndVars(event.getSessionId())
+					.whenComplete((state, ex1) -> onStateAndVarsRetrieved(event, state, ex1));
+			} catch (Throwable ex1) {
+				handleStateAndVarsRetrievalFailure(ex1, event);
+			}
+		} else {
+			handleLockAcquisitionFailure(ex, event);
+		}
+	}
+
+	private void handleLockAcquisitionFailure(Throwable ex, E event) {
+		long sessionId = event.getSessionId();
+		if (ex instanceof SpamException) {
+			log.error("Looks like somebody is spamming us. Event queue size: {}, sessionID: {}",
+				((SpamException) ex).getEventQueue().size(), sessionId);
+			renderFail(new IllegalStateException("Wait, not so fast!"), event);
+		} else {
+			log.error("Failed to acquire session lock. Session ID: " + sessionId, ex);
+			renderFail(ex, event);
+		}
+	}
+
+	private <T> void onStateAndVarsRetrieved(E event, Pair<T, Map<String, ?>> stateAndVars, Throwable ex) {
 		long sessionId = event.getSessionId();
 		if (ex == null) {
-			sessionStorage.getState(sessionId)
-				.whenComplete((state, ex1) -> onStateRetrieved(event, state, ex1));
-		} else {
-			if (ex instanceof SpamException) {
-				log.error("Looks like somebody spamming us. Event queue size: {}, sessionID: {}",
-					((SpamException) ex).getEventQueue().size(), sessionId);
-				renderFail(new IllegalStateException("Wait, not so fast!"), event);
-			} else {
-				log.error("Failed to acquire session lock. Session ID: " + sessionId, ex);
-				renderFail(ex, event);
+			try {
+				Session<T> session = Session.of(sessionId, stateAndVars);
+				Controller<T, ?, E> controller = dispatcher.dispatch(event, session);
+				whenCompleteTransition(event, controller.transit(event, session));
+			} catch (Throwable ex1) {
+				handleTransitionFailure(ex1, event);
 			}
+		} else {
+			handleStateAndVarsRetrievalFailure(ex, event);
 		}
 	}
 
-	private <T> void onStateRetrieved(E event, T state, Throwable ex) {
-		if (ex == null) {
-			sessionStorage.getVars(event.getSessionId())
-				.whenComplete((vars, ex1) -> onVarsRetrieved(event, Session.of(state, vars), ex1));
-		} else {
-			log.error("Failed to get session state. Session ID: " + event.getSessionId(), ex);
+	private void handleStateAndVarsRetrievalFailure(Throwable ex, E event) {
+		long sessionId = event.getSessionId();
+		try {
+			log.error("Failed to retrieve session state/vars. Session ID: " + sessionId, ex);
 			renderFail(ex, event);
+		} finally {
+			releaseLock(sessionId);
 		}
 	}
 
-	private <T> void onVarsRetrieved(E event, Session<T> session, Throwable ex) {
-		if (ex == null) {
-			Controller<T, ?, E> controller = dispatcher.dispatch(event, session);
-			process(event, controller.transit(event, session));
-		} else {
-			log.error("Failed to get session vars. Session ID: " + event.getSessionId(), ex);
-			renderFail(ex, event);
-		}
-
+	private void releaseLock(long sessionId) {
+		sessionStorage.releaseLock(sessionId)
+			.whenComplete((ignore, ex) -> log.error("Failed to release session lock. Session id: " + sessionId, ex));
 	}
 
 	private Session initSessionAndProcess(E event) {
@@ -152,22 +172,30 @@ public class Flow<Renderer, E extends Event> {
 		return session;
 	}
 
-	private void process(E event, CompletableFuture<? extends ViewAndState<?, Renderer, E>> future) {
+	private void whenCompleteTransition(E event, CompletableFuture<? extends ViewAndSession<?, Renderer, E>> future) {
 		future.whenComplete((viewAndState, ex) -> executor.execute(() -> {
 			if (ex == null) {
 				freeSessionAndRender(event, viewAndState);
 			} else {
-				log.error("Failed to perform transition by event {}. Cause: {}", event, getStackTraceAsString(ex));
-				renderFail(ex, event);
+				handleTransitionFailure(ex, event);
 			}
 		}));
 	}
 
-	private void freeSessionAndRender(E event, ViewAndState<?, Renderer, E> viewAndState) {
+	private void handleTransitionFailure(Throwable ex, E event) {
+		try {
+			log.error("Failed to perform transition by event {}. Cause: {}", event, getStackTraceAsString(ex));
+			renderFail(ex, event);
+		} finally {
+			releaseLock(event.getSessionId());
+		}
+	}
+
+	private void freeSessionAndRender(E event, ViewAndSession<?, Renderer, E> viewAndSession) {
 		synched(event.getSessionId(), ignore -> {
 			try {
-				freeSession(event, viewAndState);
-				viewAndState.render(rendererFactory.apply(event), event);
+				freeSession(event, viewAndSession);
+				viewAndSession.render(rendererFactory.apply(event), event);
 			} catch (Throwable ex) {
 				log.error("Failed to render view. Event: {}. Cause: {}", event, getStackTraceAsString(ex));
 				propagateIfError(ex);
@@ -176,15 +204,15 @@ public class Flow<Renderer, E extends Event> {
 		});
 	}
 
-	private void freeSession(E event, ViewAndState<?, Renderer, E> viewAndState) {
+	private void freeSession(E event, ViewAndSession<?, Renderer, E> viewAndSession) {
 		Session session = sessions.get(event.getSessionId());
-		session.setState(viewAndState.getState());
+		session.setState(viewAndSession.getState());
 		session.setBusy(false);
 		log.debug(
 			"Set new state for session {}: {}. View key: {}",
 			event.getSessionId(),
-			viewAndState.getState(),
-			viewAndState.getState().getClass().getName()
+			viewAndSession.getState(),
+			viewAndSession.getState().getClass().getName()
 		);
 	}
 
@@ -259,7 +287,7 @@ public class Flow<Renderer, E extends Event> {
 				public <To> Builder<Renderer, E> with(BiFunction<E1, From, CompletableFuture<?>> func) {
 					Controller<From, To, E1> controller = new Controller<From, To, E1>() {
 						@Override
-						public <R> CompletableFuture<ViewAndState<To, R, E1>> transit(E1 e, From s) {
+						public <R> CompletableFuture<ViewAndSession<To, R, E1>> transit(E1 e, From s) {
 							return toViewAndState((CompletableFuture<To>) func.apply(e, s));
 						}
 					};
@@ -313,7 +341,7 @@ public class Flow<Renderer, E extends Event> {
 		public <To> Builder<Renderer, E> initial(Function<E, CompletableFuture<To>> func) {
 			return initialController(new Controller<Void, To, E>() {
 				@Override
-				public <R> CompletableFuture<ViewAndState<To, R, E>> transit(E e, Void s) {
+				public <R> CompletableFuture<ViewAndSession<To, R, E>> transit(E e, Void s) {
 					return toViewAndState(func.apply(e));
 				}
 			});
@@ -408,10 +436,10 @@ public class Flow<Renderer, E extends Event> {
 		}
 
 		@SuppressWarnings("unchecked")
-		private <To, R, E1 extends E> CompletableFuture<ViewAndState<To, R, E1>> toViewAndState(
+		private <To, R, E1 extends E> CompletableFuture<ViewAndSession<To, R, E1>> toViewAndState(
 			CompletableFuture<To> future) {
 			return future.thenApply(n ->
-				ViewAndState.of(
+				ViewAndSession.of(
 					ofNullable(
 						searchInHierarchy(n.getClass(), c -> (View<To, R, E1>) views.get(c))
 					).orElseThrow(() -> new IllegalStateException(

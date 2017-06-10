@@ -8,18 +8,27 @@ import lombok.RequiredArgsConstructor;
 public interface View<State, Renderer, E extends Event> {
 	void render(Context<State, Renderer, E> context);
 
-	@Getter
 	@RequiredArgsConstructor
 	class Context<State, Renderer, E> {
-		private final State state;
+		private final Session<State> session;
+		@Getter
 		private final Renderer renderer;
+		@Getter
 		private final E event;
 
+		public State getState() {
+			return session.getState();
+		}
+
+		public <T> T getVar(String key, Class<T> probe) {
+			return session.getVar(key, probe);
+		}
+
 		public static <State, Renderer, E> Context<State, Renderer, E> of(
-			State state,
+			Session<State> session,
 			Renderer renderer,
 			E event) {
-			return new Context<>(state, renderer, event);
+			return new Context<>(session, renderer, event);
 		}
 	}
 }
