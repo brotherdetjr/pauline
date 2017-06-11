@@ -64,24 +64,14 @@ public class Flow<Renderer, E extends Event> {
 		});
 	}
 
-	private void renderFailureNoLock(Throwable ex, E event) {
-		if (allowUnlockedRendering) {
-			renderFailure(ex, event, null).whenComplete((ignore, ex1) -> {
-				if (ex1 != null) {
-					log.error("Failed to render: {}. Event: {}. Cause: {}",
-						ex, event, getStackTraceAsString(ex1));
-				}
-			});
-		}
-	}
-
 	private void process(E event) {
 		try {
 			sessionStorage
 				.acquireLock(event.getSessionId())
 				.whenComplete((ignore, ex) -> onLockAcquired(event, ex));
 		} catch (Exception ex) {
-			handleLockAcquisitionFailure(ex, event);
+			log.error("Failed to acquire session lock. Event: {}. Cause: {}", event, getStackTraceAsString(ex));
+			renderFailureNoLock(ex, event);
 		}
 	}
 
@@ -96,21 +86,12 @@ public class Flow<Renderer, E extends Event> {
 					.whenComplete((state, ex1) -> onStateAndVarsRetrieved(event, state, ex1));
 			} catch (Exception ex1) {
 				log.error("Failed to retrieve session state/vars. Event: {}. Cause: {}", event, ex1);
-				renderFailureAndUnlock(ex1, event, null);
+				renderFailureAndReleaseLock(ex1, event, null);
 			}
 		} else {
-			handleLockAcquisitionFailure(ex, event);
-		}
-	}
-
-	private void handleLockAcquisitionFailure(Throwable ex, E event) {
-		if (ex instanceof SpamException) {
-			log.error("Looks like somebody is spamming us. Event queue size: {}. Event: {}",
-				((SpamException) ex).getEventQueue().size(), event);
-		} else {
 			log.error("Failed to acquire session lock. Event: {}. Cause: {}", event, getStackTraceAsString(ex));
+			renderFailureNoLock(ex, event);
 		}
-		renderFailureNoLock(ex, event);
 	}
 
 	private <T> void onStateAndVarsRetrieved(E event, Pair<T, Map<String, ?>> stateAndVars, Throwable ex) {
@@ -122,15 +103,26 @@ public class Flow<Renderer, E extends Event> {
 				whenCompleteTransition(event, controller.transit(event, session));
 			} catch (Exception ex1) {
 				log.error("Failed to perform transition by event {}. Cause: {}", event, getStackTraceAsString(ex1));
-				renderFailureAndUnlock(ex1, event, session);
+				renderFailureAndReleaseLock(ex1, event, session);
 			}
 		} else {
 			log.error("Failed to retrieve session state/vars. Event: {}. Cause: {}", event, ex);
-			renderFailureAndUnlock(ex, event, null);
+			renderFailureAndReleaseLock(ex, event, null);
 		}
 	}
 
-	private <From> void renderFailureAndUnlock(Throwable ex, E event, Session<From> session) {
+	private void renderFailureNoLock(Throwable ex, E event) {
+		if (allowUnlockedRendering) {
+			renderFailure(ex, event, null).whenComplete((ignore, ex1) -> {
+				if (ex1 != null) {
+					log.error("Failed to render: {}. Event: {}. Cause: {}",
+						ex, event, getStackTraceAsString(ex1));
+				}
+			});
+		}
+	}
+
+	private <From> void renderFailureAndReleaseLock(Throwable ex, E event, Session<From> session) {
 		long sessionId = event.getSessionId();
 		try {
 			renderFailure(ex, event, session).whenComplete((ignore, ex1) -> {
@@ -148,10 +140,12 @@ public class Flow<Renderer, E extends Event> {
 	}
 
 	private void releaseLock(long sessionId) {
+		log.debug("Releasing session lock. Session ID: {}", sessionId);
 		sessionStorage.releaseLock(sessionId)
 			.whenComplete((ignore, ex) -> {
 				if (ex != null) {
-					log.error("Failed to release session lock. Session id: " + sessionId, ex);
+					log.error("Failed to release session lock. Session ID: {}. Cause: {}",
+						sessionId, getStackTraceAsString(ex));
 				}
 			});
 	}
@@ -162,7 +156,7 @@ public class Flow<Renderer, E extends Event> {
 				commitTransition(event, viewAndSession);
 			} else {
 				log.error("Failed to perform transition by event {}. Cause: {}", event, getStackTraceAsString(ex));
-				renderFailureAndUnlock(ex, event, viewAndSession.getSession());
+				renderFailureAndReleaseLock(ex, event, viewAndSession.getSession());
 			}
 		}));
 	}
@@ -181,20 +175,17 @@ public class Flow<Renderer, E extends Event> {
 									releaseLock(sessionId);
 								} else {
 									log.error("Failed to render view. Event: {}. Cause: {}", event, getStackTraceAsString(ex2));
-									renderFailure(ex2, event, viewAndSession.getSession());
-									releaseLock(sessionId);
+									renderFailureAndReleaseLock(ex2, event, viewAndSession.getSession());
 								}
 							});
 					} else {
 						log.error("Failed to store session. Event: {}. Cause: {}", event, getStackTraceAsString(ex1));
-						renderFailure(ex1, event, viewAndSession.getSession());
-						releaseLock(sessionId);
+						renderFailureAndReleaseLock(ex1, event, viewAndSession.getSession());
 					}
 				});
 		} catch (Throwable ex) {
 			log.error("Failed to commit transition. Event: {}. Cause: {}", event, getStackTraceAsString(ex));
-			renderFailure(ex, event, viewAndSession.getSession());
-			releaseLock(sessionId);
+			renderFailureAndReleaseLock(ex, event, viewAndSession.getSession());
 		}
 	}
 
