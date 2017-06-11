@@ -66,8 +66,10 @@ public class Flow<Renderer, E extends Event> {
 
 	private void process(E event) {
 		try {
+			long sessionId = event.getSessionId();
+			log.debug("Acquiring session lock. Session ID: {}", sessionId);
 			sessionStorage
-				.acquireLock(event.getSessionId())
+				.acquireLock(sessionId)
 				.whenComplete((ignore, ex) -> onLockAcquired(event, ex));
 		} catch (Exception ex) {
 			log.error("Failed to acquire session lock. Event: {}. Cause: {}", event, getStackTraceAsString(ex));
