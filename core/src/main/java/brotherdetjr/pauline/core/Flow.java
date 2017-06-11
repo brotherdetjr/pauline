@@ -112,7 +112,7 @@ public class Flow<Renderer, E extends Event> {
 		if (ex == null) {
 			try {
 				Session<To> session = viewAndSession.getSession();
-				sessionStorage.store(session.getState(), session.getVars())
+				sessionStorage.store(session.getState(), session.getChangedVars())
 					.whenComplete((ignore, ex1) -> onSessionStored(event, viewAndSession, ex1));
 			} catch (Exception ex1) {
 				log.error("Failed to store session. Event: {}. Cause: {}", event, getStackTraceAsString(ex1));

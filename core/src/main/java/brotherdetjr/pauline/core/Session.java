@@ -18,21 +18,21 @@ public class Session<T> {
 	@Getter
 	private final T state;
 	private final Map<String, ?> vars;
-	private final Map<String, ? super Object> newVars = newConcurrentMap();
+	private final Map<String, ? super Object> changedVars = newConcurrentMap();
 
 	public static <T> Session<T> of(long id, Pair<T, Map<String, ?>> stateAndVars) {
 		return new Session<>(id, stateAndVars.getLeft(), stateAndVars.getRight());
 	}
 
 	public <V> void setVar(String key, V value) {
-		newVars.put(key, value);
+		changedVars.put(key, value);
 	}
 
 	public <V> V getVar(String key, Class<V> probe) {
-		return (V) fromNullable(newVars.get(key)).or(vars.get(key));
+		return (V) fromNullable(changedVars.get(key)).or(vars.get(key));
 	}
 
-	public Map<String, ?> getVars() {
-		return ImmutableMap.copyOf(newVars);
+	public Map<String, ?> getChangedVars() {
+		return ImmutableMap.copyOf(changedVars);
 	}
 }
