@@ -8,9 +8,9 @@ import java.util.List;
 
 @Getter
 @RequiredArgsConstructor
-public class SpamException extends RuntimeException {
+public class SpamException extends IllegalStateException {
 
-	private final long sessionId;
+	private final Event event;
 	private final List<Event> eventQueue;
 
 }

@@ -7,8 +7,8 @@ import lombok.RequiredArgsConstructor;
 import java.util.concurrent.CompletableFuture;
 
 @FunctionalInterface
-public interface View<State, Renderer, E extends Event> {
-	CompletableFuture<Void> render(Context<State, Renderer, E> context);
+public interface View<Renderer, E extends Event> {
+	<State> CompletableFuture<Void> render(Context<State, Renderer, E> context);
 
 	@RequiredArgsConstructor
 	class Context<State, Renderer, E> {
@@ -17,6 +17,8 @@ public interface View<State, Renderer, E extends Event> {
 		private final Renderer renderer;
 		@Getter
 		private final E event;
+		@Getter
+		private final Throwable throwable;
 
 		public State getState() {
 			return session.getState();
@@ -26,11 +28,9 @@ public interface View<State, Renderer, E extends Event> {
 			return session.getVar(key, probe);
 		}
 
-		public static <State, Renderer, E> Context<State, Renderer, E> of(
-			Session<State> session,
-			Renderer renderer,
-			E event) {
-			return new Context<>(session, renderer, event);
+		public static <State, Renderer, E> Context<State, Renderer, E>
+		of(Session<State> session, Renderer renderer, E event, Throwable throwable) {
+			return new Context<>(session, renderer, event, throwable);
 		}
 	}
 }
