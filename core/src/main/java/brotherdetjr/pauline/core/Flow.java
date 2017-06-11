@@ -91,9 +91,8 @@ public class Flow<Renderer, E extends Event> {
 	}
 
 	private <T> void onStateAndVarsRetrieved(E event, Pair<T, Map<String, ?>> stateAndVars, Throwable ex) {
-		long sessionId = event.getSessionId();
 		if (ex == null) {
-			Session<T> session = Session.of(sessionId, stateAndVars);
+			Session<T> session = Session.of(event.getSessionId(), stateAndVars);
 			try {
 				dispatcher.dispatch(event, session).<Renderer>transit(event, session)
 					.whenComplete((viewAndSession, ex1) -> onTransitionPerformed(event, viewAndSession, ex1));
@@ -109,37 +108,42 @@ public class Flow<Renderer, E extends Event> {
 
 	private <To> void onTransitionPerformed(E event, ViewAndSession<To, Renderer, E> viewAndSession, Throwable ex) {
 		if (ex == null) {
-			commitTransition(event, viewAndSession);
+			try {
+				Session<To> session = viewAndSession.getSession();
+				sessionStorage.store(session.getState(), session.getVars())
+					.whenComplete((ignore, ex1) -> onSessionStored(event, viewAndSession, ex1));
+			} catch (Exception ex1) {
+				log.error("Failed to store session. Event: {}. Cause: {}", event, getStackTraceAsString(ex1));
+				renderFailureAndReleaseLock(ex1, event, viewAndSession.getSession());
+			}
 		} else {
 			log.error("Failed to perform transition. Event: {}. Cause: {}", event, getStackTraceAsString(ex));
 			renderFailureAndReleaseLock(ex, event, viewAndSession.getSession());
 		}
 	}
 
-	private <To> void commitTransition(E event, ViewAndSession<To, Renderer, E> viewAndSession) {
-		long sessionId = event.getSessionId();
-		try {
-			Session<To> session = viewAndSession.getSession();
-			sessionStorage.store(session.getState(), session.getVars())
-				.whenComplete((ignore, ex1) -> {
-					if (ex1 == null) {
-						log.debug("Set new state for. Session ID: {}. State: {}", sessionId, session.getState());
-						viewAndSession.render(rendererFactory.apply(event), event)
-							.whenComplete((ignore1, ex2) -> {
-								if (ex2 == null) {
-									releaseLock(sessionId);
-								} else {
-									log.error("Failed to render view. Event: {}. Cause: {}", event, getStackTraceAsString(ex2));
-									renderFailureAndReleaseLock(ex2, event, viewAndSession.getSession());
-								}
-							});
-					} else {
-						log.error("Failed to store session. Event: {}. Cause: {}", event, getStackTraceAsString(ex1));
-						renderFailureAndReleaseLock(ex1, event, viewAndSession.getSession());
-					}
-				});
-		} catch (Exception ex) {
+	private <To> void onSessionStored(E event, ViewAndSession<To, Renderer, E> viewAndSession, Throwable ex) {
+		if (ex == null) {
+			try {
+				log.debug("Set new state for. Session ID: {}. State: {}",
+					event.getSessionId(), viewAndSession.getSession().getState());
+				viewAndSession.render(rendererFactory.apply(event), event)
+					.whenComplete((ignore1, ex2) -> onViewRendered(event, viewAndSession, ex2));
+			} catch (Exception ex1) {
+				log.error("Failed to render view. Event: {}. Cause: {}", event, getStackTraceAsString(ex1));
+				renderFailureAndReleaseLock(ex1, event, viewAndSession.getSession());
+			}
+		} else {
 			log.error("Failed to store session. Event: {}. Cause: {}", event, getStackTraceAsString(ex));
+			renderFailureAndReleaseLock(ex, event, viewAndSession.getSession());
+		}
+	}
+
+	private <To> void onViewRendered(E event, ViewAndSession<To, Renderer, E> viewAndSession, Throwable ex) {
+		if (ex == null) {
+			releaseLock(event.getSessionId());
+		} else {
+			log.error("Failed to render view. Event: {}. Cause: {}", event, getStackTraceAsString(ex));
 			renderFailureAndReleaseLock(ex, event, viewAndSession.getSession());
 		}
 	}
