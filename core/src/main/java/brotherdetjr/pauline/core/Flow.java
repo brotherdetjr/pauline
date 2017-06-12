@@ -2,10 +2,10 @@ package brotherdetjr.pauline.core;
 
 import brotherdetjr.pauline.events.Event;
 import brotherdetjr.pauline.events.EventSource;
+import brotherdetjr.utils.futures.FailureHandler;
+import brotherdetjr.utils.futures.FutureFunction;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 import java.util.Map;
@@ -16,13 +16,19 @@ import java.util.function.Function;
 
 import static brotherdetjr.utils.Utils.checkNotNull;
 import static brotherdetjr.utils.Utils.searchInHierarchy;
+import static brotherdetjr.utils.futures.Safely.immediately;
+import static brotherdetjr.utils.futures.Safely.noFailureExpectedHere;
+import static brotherdetjr.utils.futures.Safely.safely;
 import static com.google.common.base.Throwables.getStackTraceAsString;
 import static com.google.common.collect.Maps.newConcurrentMap;
 import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
+import static java.util.Optional.of;
 import static java.util.Optional.ofNullable;
+import static java.util.concurrent.CompletableFuture.completedFuture;
+import static org.slf4j.LoggerFactory.getLogger;
 
 public class Flow<Renderer, E extends Event> {
 	private final EventSource<E> eventSource;
@@ -59,138 +65,129 @@ public class Flow<Renderer, E extends Event> {
 				executor.execute(() -> process(event));
 			} catch (Exception ex) {
 				log.error("Failed to process event: {}. Cause: {}", event, getStackTraceAsString(ex));
-				renderFailureNoLock(ex, event);
+				new EventContext(event).renderFailureNoLock(ex);
 			}
 		});
 	}
 
 	private void process(E event) {
-		try {
-			long sessionId = event.getSessionId();
-			log.debug("Acquiring session lock. Session ID: {}", sessionId);
-			sessionStorage
-				.acquireLock(sessionId)
-				.whenComplete((ignore, ex) -> onLockAcquired(event, ex));
-		} catch (Exception ex) {
-			log.error("Failed to acquire session lock. Event: {}. Cause: {}", event, getStackTraceAsString(ex));
-			renderFailureNoLock(ex, event);
-		}
+		EventContext ctx = new EventContext(event);
+		completedFuture(of(event.getSessionId()))
+			.thenCompose(safely(sessionStorage::acquireLock, ctx.handleLockAcquisitionFailure()))
+			.thenCompose(safely(sessionStorage::getStateAndVars, ctx.handleStateAndVarsRetrievalFailure()))
+			.thenCompose(immediately(sv -> Session.of(event.getSessionId(), sv), noFailureExpectedHere()))
+			.thenCompose(safely(ctx.transit(), ctx.handleTransitionFailure()))
+			.thenCompose(safely(ctx.storeSession(), ctx.handleSessionStorageFailure()))
+			.thenCompose(safely(ctx.renderView(), ctx.handleRenderingFailure()))
+			.thenCompose(safely(ignore -> ctx.releaseLock(), noFailureExpectedHere()));
 	}
 
-	private void onLockAcquired(E event, Throwable ex) {
-		if (ex == null) {
-			try {
-				sessionStorage.getStateAndVars(event.getSessionId())
-					.whenComplete((state, ex1) -> onStateAndVarsRetrieved(event, state, ex1));
-			} catch (Exception ex1) {
-				log.error("Failed to retrieve session state/vars. Event: {}. Cause: {}", event, ex1);
-				renderFailureAndReleaseLock(ex1, event, null);
-			}
-		} else {
-			log.error("Failed to acquire session lock. Event: {}. Cause: {}", event, getStackTraceAsString(ex));
-			renderFailureNoLock(ex, event);
-		}
-	}
+	private class EventContext {
+		private final E event;
 
-	private <T> void onStateAndVarsRetrieved(E event, Pair<T, Map<String, ?>> stateAndVars, Throwable ex) {
-		if (ex == null) {
-			Session<T> session = Session.of(event.getSessionId(), stateAndVars);
-			try {
-				dispatcher.dispatch(event, session).<Renderer>transit(event, session)
-					.whenComplete((viewAndSession, ex1) -> onTransitionPerformed(event, viewAndSession, ex1));
-			} catch (Exception ex1) {
-				log.error("Failed to perform transition. Event: {}. Cause: {}", event, getStackTraceAsString(ex1));
-				renderFailureAndReleaseLock(ex1, event, session);
-			}
-		} else {
-			log.error("Failed to retrieve session state/vars. Event: {}. Cause: {}", event, ex);
-			renderFailureAndReleaseLock(ex, event, null);
+		public EventContext(E event) {
+			this.event = event;
 		}
-	}
 
-	private <To> void onTransitionPerformed(E event, ViewAndSession<To, Renderer, E> viewAndSession, Throwable ex) {
-		if (ex == null) {
-			try {
-				Session<To> session = viewAndSession.getSession();
-				sessionStorage.store(session.getState(), session.getChangedVars())
-					.whenComplete((ignore, ex1) -> onSessionStored(event, viewAndSession, ex1));
-			} catch (Exception ex1) {
-				log.error("Failed to store session. Event: {}. Cause: {}", event, getStackTraceAsString(ex1));
-				renderFailureAndReleaseLock(ex1, event, viewAndSession.getSession());
-			}
-		} else {
-			log.error("Failed to perform transition. Event: {}. Cause: {}", event, getStackTraceAsString(ex));
-			renderFailureAndReleaseLock(ex, event, viewAndSession.getSession());
+		public <T> FutureFunction<Session<T>, ViewAndSession<Object, Renderer, E>> transit() {
+			return session -> dispatcher.dispatch(event, session).transit(event, session);
 		}
-	}
 
-	private <To> void onSessionStored(E event, ViewAndSession<To, Renderer, E> viewAndSession, Throwable ex) {
-		if (ex == null) {
-			try {
+		public <T> FutureFunction<ViewAndSession<T, Renderer, E>, ViewAndSession<T, Renderer, E>> storeSession() {
+			return vs -> sessionStorage
+				.store(vs.getSession().getState(), vs.getSession().getChangedVars())
+				.thenApply(ignore -> vs);
+		}
+
+		public <T> FutureFunction<ViewAndSession<T, Renderer, E>, Void> renderView() {
+			return vs -> {
 				log.debug("Set new state for. Session ID: {}. State: {}",
-					event.getSessionId(), viewAndSession.getSession().getState());
-				viewAndSession.render(rendererFactory.apply(event), event)
-					.whenComplete((ignore1, ex2) -> onViewRendered(event, viewAndSession, ex2));
-			} catch (Exception ex1) {
-				log.error("Failed to render view. Event: {}. Cause: {}", event, getStackTraceAsString(ex1));
-				renderFailureAndReleaseLock(ex1, event, viewAndSession.getSession());
+					event.getSessionId(), vs.getSession().getState());
+				return vs.render(rendererFactory.apply(event), event).thenApply(ignore -> null);
+			};
+		}
+
+		public FailureHandler<Long> handleLockAcquisitionFailure() {
+			return (ex, sessionId) -> {
+				logError("Failed to acquire session lock", ex);
+				renderFailureNoLock(ex);
+			};
+		}
+
+		public FailureHandler<Long> handleStateAndVarsRetrievalFailure() {
+			return (ex, sessionId) -> {
+				logError("Failed to retrieve session state/vars", ex);
+				renderFailureAndReleaseLock(ex, null);
+			};
+		}
+
+		public <T> FailureHandler<Session<T>> handleTransitionFailure() {
+			return (ex, session) -> {
+				logError("Failed to perform transition", ex);
+				renderFailureAndReleaseLock(ex, session);
+			};
+		}
+
+		public <T> FailureHandler<ViewAndSession<T, Renderer, E>> handleSessionStorageFailure() {
+			return (ex, vs) -> {
+				logError("Failed to store session", ex);
+				renderFailureAndReleaseLock(ex, vs.getSession());
+			};
+		}
+
+		public <T> FailureHandler<ViewAndSession<T, Renderer, E>> handleRenderingFailure() {
+			return (ex, vs) -> {
+				logError("Failed to render view", ex);
+				renderFailureAndReleaseLock(ex, vs.getSession());
+			};
+		}
+
+		private void logError(String message, Throwable ex) {
+			log.error("{}. Event: {}. Cause: {}", message, event, getStackTraceAsString(ex));
+		}
+
+		private void renderFailureNoLock(Throwable ex) {
+			if (allowUnlockedRendering) {
+				renderFailure(ex, null).whenComplete((ignore, ex1) -> {
+					if (ex1 != null) {
+						log.error("Failed to render: {}. Event: {}. Cause: {}",
+							ex, event, getStackTraceAsString(ex1));
+					}
+				});
 			}
-		} else {
-			log.error("Failed to store session. Event: {}. Cause: {}", event, getStackTraceAsString(ex));
-			renderFailureAndReleaseLock(ex, event, viewAndSession.getSession());
 		}
-	}
 
-	private <To> void onViewRendered(E event, ViewAndSession<To, Renderer, E> viewAndSession, Throwable ex) {
-		if (ex == null) {
-			releaseLock(event.getSessionId());
-		} else {
-			log.error("Failed to render view. Event: {}. Cause: {}", event, getStackTraceAsString(ex));
-			renderFailureAndReleaseLock(ex, event, viewAndSession.getSession());
+		private <From> void renderFailureAndReleaseLock(Throwable ex, Session<From> session) {
+			try {
+				renderFailure(ex, session).whenComplete((ignore, ex1) -> {
+					if (ex1 != null) {
+						log.error("Failed to render: {}. Event: {}. Cause: {}",
+							ex, event, getStackTraceAsString(ex1));
+					}
+					releaseLock();
+				});
+			} catch (Exception ex1) {
+				log.error("Failed to render: {}. Event: {}. Cause: {}",
+					ex, event, getStackTraceAsString(ex1));
+				releaseLock();
+			}
 		}
-	}
 
-	private void renderFailureNoLock(Throwable ex, E event) {
-		if (allowUnlockedRendering) {
-			renderFailure(ex, event, null).whenComplete((ignore, ex1) -> {
-				if (ex1 != null) {
-					log.error("Failed to render: {}. Event: {}. Cause: {}",
-						ex, event, getStackTraceAsString(ex1));
-				}
-			});
+		private <State> CompletableFuture<Void> renderFailure(Throwable ex, Session<State> session) {
+			return failView.render(View.Context.of(session, rendererFactory.apply(event), event, ex));
 		}
-	}
 
-	private <From> void renderFailureAndReleaseLock(Throwable ex, E event, Session<From> session) {
-		long sessionId = event.getSessionId();
-		try {
-			renderFailure(ex, event, session).whenComplete((ignore, ex1) -> {
-				if (ex1 != null) {
-					log.error("Failed to render: {}. Event: {}. Cause: {}",
-						ex, event, getStackTraceAsString(ex1));
-				}
-				releaseLock(sessionId);
-			});
-		} catch (Exception ex1) {
-			log.error("Failed to render: {}. Event: {}. Cause: {}",
-				ex, event, getStackTraceAsString(ex1));
-			releaseLock(sessionId);
+		private CompletableFuture<Void> releaseLock() {
+			long sessionId = event.getSessionId();
+			log.debug("Releasing session lock. Session ID: {}", sessionId);
+			return sessionStorage.releaseLock(sessionId)
+				.whenComplete((ignore, ex) -> {
+					if (ex != null) {
+						log.error("Failed to release session lock. Session ID: {}. Cause: {}",
+							sessionId, getStackTraceAsString(ex));
+					}
+				});
 		}
-	}
-
-	private <State> CompletableFuture<Void> renderFailure(Throwable ex, E event, Session<State> session) {
-		return failView.render(View.Context.of(session, rendererFactory.apply(event), event, ex));
-	}
-
-	private void releaseLock(long sessionId) {
-		log.debug("Releasing session lock. Session ID: {}", sessionId);
-		sessionStorage.releaseLock(sessionId)
-			.whenComplete((ignore, ex) -> {
-				if (ex != null) {
-					log.error("Failed to release session lock. Session ID: {}. Cause: {}",
-						sessionId, getStackTraceAsString(ex));
-				}
-			});
 	}
 
 	@RequiredArgsConstructor
@@ -203,7 +200,7 @@ public class Flow<Renderer, E extends Event> {
 		private Map<Long, Session> sessions = newConcurrentMap();
 		private int stripes = 1000;
 		private Function<E, Renderer> rendererFactory;
-		private Logger log = LoggerFactory.getLogger(Flow.class);
+		private Logger log = getLogger(Flow.class);
 
 		private Controller<?, ?, E> initial;
 

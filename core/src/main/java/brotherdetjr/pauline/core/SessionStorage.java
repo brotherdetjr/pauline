@@ -7,7 +7,7 @@ import java.util.concurrent.CompletableFuture;
 
 public interface SessionStorage {
 
-	CompletableFuture<Void> acquireLock(long sessionId) throws SpamException;
+	CompletableFuture<Long> acquireLock(long sessionId) throws SpamException;
 
 	<T> CompletableFuture<Pair<T, Map<String, ?>>> getStateAndVars(long sessionId);
 
