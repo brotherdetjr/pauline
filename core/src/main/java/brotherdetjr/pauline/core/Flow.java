@@ -2,8 +2,8 @@ package brotherdetjr.pauline.core;
 
 import brotherdetjr.pauline.events.Event;
 import brotherdetjr.pauline.events.EventSource;
-import brotherdetjr.utils.futures.FailureHandler;
-import brotherdetjr.utils.futures.FutureFunction;
+import brotherdetjr.utils.futures.PhasedImpl;
+import brotherdetjr.utils.futures.SafePipeline;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 
@@ -16,9 +16,7 @@ import java.util.function.Function;
 
 import static brotherdetjr.utils.Utils.checkNotNull;
 import static brotherdetjr.utils.Utils.searchInHierarchy;
-import static brotherdetjr.utils.futures.Safely.immediately;
-import static brotherdetjr.utils.futures.Safely.noFailureExpectedHere;
-import static brotherdetjr.utils.futures.Safely.safely;
+import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Throwables.getStackTraceAsString;
 import static com.google.common.collect.Maps.newConcurrentMap;
 import static com.google.common.collect.Maps.newHashMap;
@@ -65,87 +63,112 @@ public class Flow<Renderer, E extends Event> {
 				executor.execute(() -> process(event));
 			} catch (Exception ex) {
 				log.error("Failed to process event: {}. Cause: {}", event, getStackTraceAsString(ex));
-				new EventContext(event).renderFailureNoLock(ex);
+				// TODO!!!!!!!!!!!!!!!!!!!!
+//				new EventContext(event).renderFailureNoLock(ex);
 			}
 		});
 	}
 
-	private void process(E event) {
-		EventContext ctx = new EventContext(event);
-		completedFuture(of(event.getSessionId()))
-			.thenCompose(safely(sessionStorage::acquireLock, ctx.handleLockAcquisitionFailure()))
-			.thenCompose(safely(sessionStorage::getStateAndVars, ctx.handleStateAndVarsRetrievalFailure()))
-			.thenCompose(immediately(sv -> Session.of(event.getSessionId(), sv), noFailureExpectedHere()))
-			.thenCompose(safely(ctx.transit(), ctx.handleTransitionFailure()))
-			.thenCompose(safely(ctx.storeSession(), ctx.handleSessionStorageFailure()))
-			.thenCompose(safely(ctx.renderView(), ctx.handleRenderingFailure()))
-			.thenCompose(safely(ignore -> ctx.releaseLock(), noFailureExpectedHere()));
-	}
 
-	private class EventContext {
+	private static class EventCtx<E extends Event, R> extends PhasedImpl<EventCtx<E, R>> {
 		private final E event;
+		private boolean lockAcquired;
+		private Session<?> session;
+		private View<R, E> view;
 
-		public EventContext(E event) {
+		public EventCtx(E event) {
+			super("acquire lock");
 			this.event = event;
 		}
 
-		public <T> FutureFunction<Session<T>, ViewAndSession<Object, Renderer, E>> transit() {
-			return session -> dispatcher.dispatch(event, session).transit(event, session);
+		public E event() {
+			return event;
 		}
 
-		public <T> FutureFunction<ViewAndSession<T, Renderer, E>, ViewAndSession<T, Renderer, E>> storeSession() {
-			return vs -> sessionStorage
-				.store(vs.getSession().getState(), vs.getSession().getChangedVars())
-				.thenApply(ignore -> vs);
+		public boolean lockAcquired() {
+			return lockAcquired;
 		}
 
-		public <T> FutureFunction<ViewAndSession<T, Renderer, E>, Void> renderView() {
-			return vs -> {
+		public EventCtx<E, R> lockAcquired(boolean lockAcquired) {
+			this.lockAcquired = lockAcquired;
+			return this;
+		}
+
+		@SuppressWarnings("unchecked")
+		public <T> Session<T> session() {
+			return (Session<T>) session;
+		}
+
+		public <T> EventCtx<E, R> session(Session<T> session) {
+			this.session = session;
+			return this;
+		}
+
+		public View<R, E> view() {
+			return view;
+		}
+
+		public EventCtx<E, R> view(View<R, E> view) {
+			this.view = view;
+			return this;
+		}
+
+		@Override
+		public String toString() {
+			return toStringHelper(this)
+				.add("phase", phase())
+				.add("event", event)
+				.add("lockAcquired", lockAcquired)
+				.add("state", session.getState())
+				.add("vars", session.getChangedVars())
+				.toString();
+		}
+	}
+
+	private void process(E event) {
+		SafePipeline<EventCtx<E, Renderer>> p = new SafePipeline<>((ex, ctx) -> {
+			if (ctx.lockAcquired()) {
+				// TODO
+			} else if (allowUnlockedRendering) {
+				// TODO
+			}
+		});
+		completedFuture(of(new EventCtx<E, Renderer>(event)))
+			.thenCompose(p.safely(ctx ->
+				sessionStorage
+					.acquireLock(ctx.event().getSessionId())
+					.thenApply(ignore -> ctx.lockAcquired(true).phase("get state and vars"))
+			))
+			.thenCompose(p.safely(ctx ->
+				sessionStorage
+					.getStateAndVars(ctx.event().getSessionId())
+					.thenApply(sv -> ctx.session(Session.of(ctx.event().getSessionId(), sv)).phase("perform transition"))
+			))
+			.thenCompose(p.safely(ctx ->
+				dispatcher
+					.dispatch(event, ctx.session)
+					.transit(event, ctx.session())
+					.thenApply(vs -> ctx.view(vs.getView()).session(vs.getSession()).phase("store session"))
+			))
+			.thenCompose(p.safely(ctx ->
+				sessionStorage
+					.store(ctx.session().getState(), ctx.session().getChangedVars())
+					.thenApply(ignore -> ctx.phase("render"))
+			))
+			.thenCompose(p.safely(ctx -> {
 				log.debug("Set new state for. Session ID: {}. State: {}",
-					event.getSessionId(), vs.getSession().getState());
-				return vs.render(rendererFactory.apply(event), event).thenApply(ignore -> null);
-			};
-		}
+					ctx.event().getSessionId(), ctx.session().getState());
+				return ctx.view().render(rendererFactory.apply(ctx.event()), ctx.event()).thenApply(ignore -> ctx);
+			}))
+			.thenCompose(p.safely(ctx ->
+				sessionStorage
+					.releaseLock(ctx.session().getId())
+					.thenApply(ignore -> ctx)
+			));
+	}
 
-		public FailureHandler<Long> handleLockAcquisitionFailure() {
-			return (ex, sessionId) -> {
-				logError("Failed to acquire session lock", ex);
-				renderFailureNoLock(ex);
-			};
-		}
 
-		public FailureHandler<Long> handleStateAndVarsRetrievalFailure() {
-			return (ex, sessionId) -> {
-				logError("Failed to retrieve session state/vars", ex);
-				renderFailureAndReleaseLock(ex, null);
-			};
-		}
-
-		public <T> FailureHandler<Session<T>> handleTransitionFailure() {
-			return (ex, session) -> {
-				logError("Failed to perform transition", ex);
-				renderFailureAndReleaseLock(ex, session);
-			};
-		}
-
-		public <T> FailureHandler<ViewAndSession<T, Renderer, E>> handleSessionStorageFailure() {
-			return (ex, vs) -> {
-				logError("Failed to store session", ex);
-				renderFailureAndReleaseLock(ex, vs.getSession());
-			};
-		}
-
-		public <T> FailureHandler<ViewAndSession<T, Renderer, E>> handleRenderingFailure() {
-			return (ex, vs) -> {
-				logError("Failed to render view", ex);
-				renderFailureAndReleaseLock(ex, vs.getSession());
-			};
-		}
-
-		private void logError(String message, Throwable ex) {
-			log.error("{}. Event: {}. Cause: {}", message, event, getStackTraceAsString(ex));
-		}
-
+	/*
 		private void renderFailureNoLock(Throwable ex) {
 			if (allowUnlockedRendering) {
 				renderFailure(ex, null).whenComplete((ignore, ex1) -> {
@@ -188,7 +211,8 @@ public class Flow<Renderer, E extends Event> {
 					}
 				});
 		}
-	}
+
+	 */
 
 	@RequiredArgsConstructor
 	public static class Builder<Renderer, E extends Event> {
