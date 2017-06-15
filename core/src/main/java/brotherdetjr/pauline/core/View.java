@@ -32,5 +32,10 @@ public interface View<Renderer, E extends Event> {
 		of(Session<State> session, Renderer renderer, E event, Throwable throwable) {
 			return new Context<>(session, renderer, event, throwable);
 		}
+
+		public static <State, Renderer, E> Context<State, Renderer, E>
+		of(Session<State> session, Renderer renderer, E event) {
+			return of(session, renderer, event, null);
+		}
 	}
 }

@@ -3,7 +3,7 @@ package brotherdetjr.pauline.core;
 import brotherdetjr.pauline.events.Event;
 import brotherdetjr.pauline.events.EventSource;
 import brotherdetjr.utils.futures.PhasedImpl;
-import brotherdetjr.utils.futures.SafePipeline;
+import brotherdetjr.utils.futures.Pipeline;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 
@@ -23,9 +23,7 @@ import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
-import static java.util.Optional.of;
 import static java.util.Optional.ofNullable;
-import static java.util.concurrent.CompletableFuture.completedFuture;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class Flow<Renderer, E extends Event> {
@@ -70,13 +68,13 @@ public class Flow<Renderer, E extends Event> {
 	}
 
 
-	private static class EventCtx<E extends Event, R> extends PhasedImpl<EventCtx<E, R>> {
+	private static class EventContext<E extends Event, R> extends PhasedImpl<EventContext<E, R>> {
 		private final E event;
 		private boolean lockAcquired;
 		private Session<?> session;
 		private View<R, E> view;
 
-		public EventCtx(E event) {
+		public EventContext(E event) {
 			super("acquire lock");
 			this.event = event;
 		}
@@ -89,7 +87,7 @@ public class Flow<Renderer, E extends Event> {
 			return lockAcquired;
 		}
 
-		public EventCtx<E, R> lockAcquired(boolean lockAcquired) {
+		public EventContext<E, R> lockAcquired(boolean lockAcquired) {
 			this.lockAcquired = lockAcquired;
 			return this;
 		}
@@ -99,7 +97,7 @@ public class Flow<Renderer, E extends Event> {
 			return (Session<T>) session;
 		}
 
-		public <T> EventCtx<E, R> session(Session<T> session) {
+		public <T> EventContext<E, R> session(Session<T> session) {
 			this.session = session;
 			return this;
 		}
@@ -108,7 +106,7 @@ public class Flow<Renderer, E extends Event> {
 			return view;
 		}
 
-		public EventCtx<E, R> view(View<R, E> view) {
+		public EventContext<E, R> view(View<R, E> view) {
 			this.view = view;
 			return this;
 		}
@@ -126,47 +124,38 @@ public class Flow<Renderer, E extends Event> {
 	}
 
 	private void process(E event) {
-		SafePipeline<EventCtx<E, Renderer>> p = new SafePipeline<>((ex, ctx) -> {
-			if (ctx.lockAcquired()) {
-				// TODO
-			} else if (allowUnlockedRendering) {
-				// TODO
-			}
-		});
-		completedFuture(of(new EventCtx<E, Renderer>(event)))
-			.thenCompose(p.safely(ctx ->
+		Pipeline.of(new EventContext<E, Renderer>(event))
+			.then(ctx ->
 				sessionStorage
 					.acquireLock(ctx.event().getSessionId())
-					.thenApply(ignore -> ctx.lockAcquired(true).phase("get state and vars"))
-			))
-			.thenCompose(p.safely(ctx ->
+					.thenApply(ignore -> ctx.lockAcquired(true).phase("get state and vars")))
+			.then(ctx ->
 				sessionStorage
 					.getStateAndVars(ctx.event().getSessionId())
-					.thenApply(sv -> ctx.session(Session.of(ctx.event().getSessionId(), sv)).phase("perform transition"))
-			))
-			.thenCompose(p.safely(ctx ->
+					.thenApply(sv -> ctx.session(Session.of(ctx.event().getSessionId(), sv)).phase("perform transition")))
+			.then(ctx ->
 				dispatcher
 					.dispatch(event, ctx.session)
-					.transit(event, ctx.session())
-					.thenApply(vs -> ctx.view(vs.getView()).session(vs.getSession()).phase("store session"))
-			))
-			.thenCompose(p.safely(ctx ->
+					.<Renderer>transit(event, ctx.session())
+					.thenApply(vs -> ctx.view(vs.getView()).session(vs.getSession()).phase("store session")))
+			.then(ctx ->
 				sessionStorage
 					.store(ctx.session().getState(), ctx.session().getChangedVars())
-					.thenApply(ignore -> ctx.phase("render"))
-			))
-			.thenCompose(p.safely(ctx -> {
+					.thenApply(ignore -> ctx.phase("render")))
+			.then(ctx -> {
 				log.debug("Set new state for. Session ID: {}. State: {}",
 					ctx.event().getSessionId(), ctx.session().getState());
-				return ctx.view().render(rendererFactory.apply(ctx.event()), ctx.event()).thenApply(ignore -> ctx);
-			}))
-			.thenCompose(p.safely(ctx ->
+				View.Context<?, Renderer, E> viewContext =
+					View.Context.of(ctx.session, rendererFactory.apply(ctx.event()), ctx.event());
+				return ctx.view().render(viewContext).thenApply(ignore -> ctx);
+			})
+			.then(ctx ->
 				sessionStorage
 					.releaseLock(ctx.session().getId())
 					.thenApply(ignore -> ctx)
-			));
+			)
+			.onFail((ex, ctx) -> {}); // TODO
 	}
-
 
 	/*
 		private void renderFailureNoLock(Throwable ex) {
